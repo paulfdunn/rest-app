@@ -1,0 +1,136 @@
+#
+# ubuntu 20.0.4 kubernetes master started with 8GB, and that held k8s, operator sdk,  go etc.
+# but not enough space to run operator sdk demo. Expanded to 12GB; example took 9GB.
+# ubuntu 20.0.4 kubernetes node takes 3GB
+#
+
+# login to the cluster members; master, node0, node1
+ssh -i ~/.ssh/pfd-ec2-main.pem ubuntu@ec2-3-22-34-165.us-east-2.compute.amazonaws.com
+ssh -i ~/.ssh/pfd-ec2-main.pem ubuntu@ec2-3-14-81-114.us-east-2.compute.amazonaws.com
+ssh -i ~/.ssh/pfd-ec2-main.pem ubuntu@ec2-3-139-136-55.us-east-2.compute.amazonaws.com
+
+##############
+# MASTER
+##############
+sudo apt update
+sudo apt install make -y
+sudo apt install libc-dev gcc -y
+# install go and operator sdk
+cd /tmp
+# remove any existing version; otherwise copying a new version into an existing one
+# can create problems.
+sudo rm -rf /usr/local/go
+curl -o go1.15.11.linux-amd64.tar.gz https://dl.google.com/go/go1.15.11.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.15.11.linux-amd64.tar.gz
+cd $HOME
+cat $HOME/.profile
+echo $'\nGOPATH="$HOME/go"\n' >> $HOME/.profile
+echo $'\nPATH="$PATH:/usr/local/go/bin"\n' >> $HOME/.profile
+cat $HOME/.profile
+source $HOME/.profile
+go env -w GOPROXY="https://proxy.golang.org,direct"
+cd $HOME
+#
+mkdir -p ~/go/src/github.com
+cd $HOME/go/src/github.com
+git clone https://github.com/operator-framework/operator-sdk
+cd operator-sdk
+git checkout master
+make install
+
+##############
+# ALL MASTER/NODES
+##############
+#some from here: https://linuxconfig.org/how-to-install-kubernetes-on-ubuntu-20-04-focal-fossa-linux
+sudo apt update
+sudo apt install docker.io -y
+sudo usermod -aG docker $USER
+sudo systemctl start docker
+sudo systemctl enable docker
+# set the storage driver
+sudo mkdir /etc/docker
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+sudo apt install apt-transport-https curl -y
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+sudo apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+sudo apt install kubeadm kubelet kubectl kubernetes-cni -y
+
+# not necessary on EC2 instances?
+#sudo swapoff -a
+#sudo nano /etc/fstab
+#Inside this file, comment out the /swapfile line by preceeding it with a # symbol, as seen below. Then, close this file and save the changes.
+
+sudo apt install nfs-core -y
+
+##############
+# MASTER
+##############
+# KEY - hostname is used in the cert and must match the public DNS name.
+
+
+
+# NFS for persistent shared volume
+sudo apt-get install nfs-kernel-server -y
+sudo mkdir -p /opt/example/data
+sudo chown nobody:nogroup /opt/example/data
+cat <<EOF | sudo tee /etc/exports
+/opt/example/data    *(rw,sync,no_subtree_check)
+EOF
+sudo systemctl restart nfs-kernel-server
+
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+# command tells you to:
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+sudo docker login --username paulfdunn
+# regecred is used by deployment yaml
+kubectl create secret generic regcred \
+    --from-file=.dockerconfigjson=/home/ubuntu/.docker/config.json \
+    --type=kubernetes.io/dockerconfigjson
+
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/k8s-manifests/kube-flannel-rbac.yml
+
+##############
+# NODES
+##############
+sudo kubeadm join ec2-3-22-34-165.us-east-2.compute.amazonaws.com:6443 --token vx89ie.29ygynt1w9d9627i \
+        --discovery-token-ca-cert-hash sha256:adb2db947e2b57f61ceffa2600266efcff57640f928eb2a8b47846dbc24e1bba
+
+##############
+# MASTER
+##############
+kubectl get nodes
+
+##############
+# HOST
+##############
+scp -i ~/.ssh/pfd-ec2-main.pem ~/go/src/github.com/paulfdunn/example/*.yaml \
+    ubuntu@ec2-3-22-34-165.us-east-2.compute.amazonaws.com:~/
+
+##############
+# MASTER
+##############
+kubectl apply -f pv.yaml
+kubectl apply -f pvc.yaml
+kubectl apply -f deployment.yaml
+
+kubectl get pods -o=go-template --template '{{range .items}}{{.metadata.name}}{{" "}}{{.status.podIP}}{{"\n"}}{{end}}'
+FIRST_POD_IP=$(kubectl get pods -o=go-template --template '{{(index .items 0).status.podIP}}{{"\n"}}')
+# similar but using json
+# kubectl get pods -o jsonpath='{.items[0].status.podIP}'
+curl -i -k https://"${FIRST_POD_IP}":8000/auth/login

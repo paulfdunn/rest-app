@@ -1,0 +1,14 @@
+2024/03/16 22:07:40.160498 config.go:115:    info: example is starting....
+2024/03/16 22:07:40.160837 config.go:117:    info: logFilepath:./example.log
+2024/03/16 22:07:40.160853 config.go:118:    info: auditLogFilepath:./example.log.audit
+2024/03/16 22:07:40.164247 example.go:65:    info: Config: {"HTTPSPort":8000,"LogFilepath":"./example.log","LogLevel":0,"AppName":"example","AppPath":"/Users/pauldunn/go/src/github.com/paulfdunn/rest-app/example","AuditLogName":"example.audit","DataSourceName":"/Users/pauldunn/go/src/github.com/paulfdunn/rest-app/example/example.db","JWTKeyFilepath":"/Users/pauldunn/go/src/github.com/paulfdunn/rest-app/example/key/jwt.rsa.public","JWTAuthRemoveInterval":60000000000,"JWTAuthTimeoutInterval":900000000000,"LogName":"example","NewDataSource":true,"PasswordValidation":["^[\\S]{8,32}$","[a-z]","[A-Z]","[!#$%'()*+,-.\\\\/:;=?@\\[\\]^_{|}~]","[0-9]"],"PersistentDirectory":"/Users/pauldunn/go/src/github.com/paulfdunn/rest-app/example"}
+2024/03/16 22:07:40.164598 authJWT.go:112:    info: Registered handler: /auth/create/
+2024/03/16 22:07:40.164656 authJWT.go:115:    info: Registered handler: /auth/delete/
+2024/03/16 22:07:40.164668 authJWT.go:118:    info: Registered handler: /auth/info/
+2024/03/16 22:07:40.164676 authJWT.go:121:    info: Registered handler: /auth/login/
+2024/03/16 22:07:40.164686 authJWT.go:124:    info: Registered handler: /auth/logout/
+2024/03/16 22:07:40.164695 authJWT.go:127:    info: Registered handler: /auth/logout-all/
+2024/03/16 22:07:40.164703 authJWT.go:130:    info: Registered handler: /auth/refresh/
+2024/03/16 22:07:40.247841 example.go:112:    info: Created default auth: admin
+2024/03/16 22:07:40.247869 example.go:94:    info: Registered handler: /
+2024/03/16 22:07:44.878212 example.go:116:    info: rest-app handler {GET / HTTP/2.0 2 0 map[Accept:[*/*] Authorization:[Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MTA2Mjc3NjQsImlzcyI6ImV4YW1wbGUiLCJFbWFpbCI6ImFkbWluIiwiVG9rZW5JRCI6ImU2ZDVkYmUzLTJiY2EtZWUyNy0yMTBhLTViNjBmMzM2OGQyMiJ9.N-Dm0nRStAL2pRoCPBH1iAT2Bi5AZtELL5-uRNPE2Wc] User-Agent:[curl/8.4.0]] 0x14000274c00 <nil> 0 [] false 127.0.0.1:8000 map[] map[] <nil> map[] 127.0.0.1:65067 / 0x1400030e0b0 <nil> <nil> 0x140000f0c80}
