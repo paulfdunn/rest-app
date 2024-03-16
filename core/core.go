@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/paulfdunn/authJWT"
-	"github.com/paulfdunn/core/config"
 	"github.com/paulfdunn/go-helper/logh"
+	"github.com/paulfdunn/rest-app/core/config"
 )
 
 const (

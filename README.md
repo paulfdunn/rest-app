@@ -2,7 +2,7 @@
 This is the framework for a GO (GOLANG) based ReST API. This can be used as the basis for a GO based app, needing JWT user authentication, with logging and key/value store (KVS). 
 
 There are 2 parts to this application"
-* github.com/paulfdunn/core - Application initialization and configuration. This is provided in a core package to allow leveraging many apps from the same configuration/initialization code. 
+* github.com/paulfdunn/rest-app/core - Application initialization and configuration. This is provided in a core package to allow leveraging many apps from the same configuration/initialization code. 
 * github.com/paulfdunn/example is provided to show an example of one app, using the core configuration/initialization provided.
 
 Key features:

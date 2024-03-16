@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/paulfdunn/authJWT"
-	"github.com/paulfdunn/core"
-	"github.com/paulfdunn/core/config"
 	"github.com/paulfdunn/go-helper/logh"
 	"github.com/paulfdunn/go-helper/osh/runtimeh"
+	"github.com/paulfdunn/rest-app/core"
+	"github.com/paulfdunn/rest-app/core/config"
 )
 
 const (

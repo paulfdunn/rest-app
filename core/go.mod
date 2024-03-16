@@ -2,14 +2,10 @@ module github.com/paulfdunn/rest-app/core
 
 go 1.21.7
 
-replace (
-    github.com/paulfdunn/core => /Users/pauldunn/go/src/github.com/paulfdunn/rest-app/core
-    github.com/paulfdunn/core/config => /Users/pauldunn/go/src/github.com/paulfdunn/rest-app/core/config
-)
 require (
 	github.com/paulfdunn/authJWT v1.0.3
 	github.com/paulfdunn/go-helper/logh v1.0.7
-	github.com/paulfdunn/core/config v0.0.0-00010101000000-000000000000
+	github.com/paulfdunn/rest-app/core/config v0.0.0-20240316221305-8cf0b6c1fac5
 )
 
 require (
