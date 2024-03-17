@@ -9,13 +9,13 @@ docker network rm restNet
 
 cleanup
 
-docker build -t paulfdunn/example:v0.0.0 .
+docker build -t paulfdunn/rest-app/example:v0.0.0 .
 
 docker network inspect restNet
 if [[ $? != 0 ]]; then
     docker network create restNet -d bridge
 fi
-docker run -d --hostname example --name example --network restNet paulfdunn/example:v0.0.0
+docker run -d --hostname example --name example --network restNet paulfdunn/rest-app/example:v0.0.0
 
 # Give time for the container to start.
 sleep 5

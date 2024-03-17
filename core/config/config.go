@@ -23,18 +23,18 @@ type Config struct {
 	LogLevel    *int    `json:",omitempty"`
 
 	// Other
-	AppName                *string        `json:",omitempty"`
-	AppPath                *string        `json:",omitempty"`
-	AuditLogName           *string        `json:",omitempty"`
-	DataSourceName         *string        `json:",omitempty"`
-	JWTKeyFilepath         *string        `json:",omitempty"`
-	JWTAuthRemoveInterval  *time.Duration `json:",omitempty"`
-	JWTAuthTimeoutInterval *time.Duration `json:",omitempty"`
-	LogName                *string        `json:",omitempty"`
-	NewDataSource          *bool          `json:",omitempty"`
-	PasswordValidation     []string       `json:",omitempty"`
-	PersistentDirectory    *string        `json:",omitempty"`
-	Version                *string        `json:",omitempty"`
+	AppName                   *string        `json:",omitempty"`
+	AppPath                   *string        `json:",omitempty"`
+	AuditLogName              *string        `json:",omitempty"`
+	DataSourcePath            *string        `json:",omitempty"`
+	JWTKeyPath                *string        `json:",omitempty"`
+	JWTAuthRemoveInterval     *time.Duration `json:",omitempty"`
+	JWTAuthExpirationInterval *time.Duration `json:",omitempty"`
+	LogName                   *string        `json:",omitempty"`
+	NewDataSource             *bool          `json:",omitempty"`
+	PasswordValidation        []string       `json:",omitempty"`
+	PersistentDirectory       *string        `json:",omitempty"`
+	Version                   *string        `json:",omitempty"`
 }
 
 const (
@@ -60,7 +60,6 @@ var (
 )
 
 // Init initializes the configuration and logging for the application.
-// logName - Used to name the logh log and audit log; usually this will be the app name.
 // checkLogSize/maxLogSize - logh parameters for the application log.
 // checkLogSizeAudit/maxLogSizeAudit - logh parameters for the audit log.
 // filepathsToDeleteOnReset - fully qualified file paths for any files that needs deleted on
@@ -85,14 +84,14 @@ func Init(cnfg Config, checkLogSize int, maxLogSize int64,
 		}
 	}
 
-	dataSourceName := filepath.Join(*persistentDirectory, *cnfg.AppName+".db")
+	dataSourcePath := filepath.Join(*persistentDirectory, *cnfg.AppName+".db")
 	newDataSource := false
-	if _, err := os.Stat(dataSourceName); os.IsNotExist(err) {
+	if _, err := os.Stat(dataSourcePath); os.IsNotExist(err) {
 		newDataSource = true
 	}
 
 	// reset if requested - do PRIOR to logging setup as logs are deleted.
-	if err = resetIfRequested(*reset, dataSourceName, filepathsToDeleteOnReset); err != nil {
+	if err = resetIfRequested(*reset, dataSourcePath, filepathsToDeleteOnReset); err != nil {
 		log.Fatalf("fatal: %s resetIfRequested error: %v", runtimeh.SourceInfo(), err)
 	}
 
@@ -104,7 +103,7 @@ func Init(cnfg Config, checkLogSize int, maxLogSize int64,
 	}
 	var auditLogName, auditLogFilepath string
 	if *logFilepath != "" {
-		auditLogName = *cnfg.LogName + ".audit"
+		auditLogName = *cnfg.AuditLogName + ".audit"
 		auditLogFilepath = *logFilepath + ".audit"
 	}
 	err = logh.New(auditLogName, auditLogFilepath, logh.DefaultLevels, logh.Audit,
@@ -117,7 +116,7 @@ func Init(cnfg Config, checkLogSize int, maxLogSize int64,
 	logh.Map[*cnfg.LogName].Printf(logh.Info, "logFilepath:%s", *logFilepath)
 	logh.Map[*cnfg.LogName].Printf(logh.Info, "auditLogFilepath:%s", auditLogFilepath)
 
-	initializeKVInstance(dataSourceName)
+	initializeKVInstance(dataSourcePath)
 
 	DefaultConfig = cnfg
 	// CLI
@@ -128,7 +127,7 @@ func Init(cnfg Config, checkLogSize int, maxLogSize int64,
 	// Other
 	DefaultConfig.AppName = cnfg.AppName
 	DefaultConfig.AuditLogName = &auditLogName
-	DefaultConfig.DataSourceName = &dataSourceName
+	DefaultConfig.DataSourcePath = &dataSourcePath
 	DefaultConfig.LogName = cnfg.LogName
 	DefaultConfig.NewDataSource = &newDataSource
 }
@@ -157,14 +156,14 @@ func Get() (Config, error) {
 }
 
 // resetIfRequested - delete all application data if reset == true.
-func resetIfRequested(reset bool, dataSourceName string, filepathsToDeleteOnReset []string) error {
+func resetIfRequested(reset bool, dataSourcePath string, filepathsToDeleteOnReset []string) error {
 	var errOut error
 	if reset {
-		// If the dataSourceName is a file, delete it.
-		if _, err := os.Stat(dataSourceName); err == nil {
-			err := os.Remove(dataSourceName)
+		// If the dataSourcePath is a file, delete it.
+		if _, err := os.Stat(dataSourcePath); err == nil {
+			err := os.Remove(dataSourcePath)
 			if err != nil {
-				errOut = fmt.Errorf("deleting file: %s, error: %v, prior errors: %v", dataSourceName, err, errOut)
+				errOut = fmt.Errorf("deleting file: %s, error: %v, prior errors: %v", dataSourcePath, err, errOut)
 			}
 		}
 
@@ -186,10 +185,10 @@ func resetIfRequested(reset bool, dataSourceName string, filepathsToDeleteOnRese
 }
 
 // initializeKVInstance - Initialize the KVS
-func initializeKVInstance(dataSourceName string) {
+func initializeKVInstance(dataSourcePath string) {
 	var err error
 	// The KVS table name and key will both use configKey.
-	if kvi, err = kvs.New(dataSourceName, configKey); err != nil {
+	if kvi, err = kvs.New(dataSourcePath, configKey); err != nil {
 		log.Fatalf("fatal: %s could not create New kvs, error: %v", runtimeh.SourceInfo(), err)
 	}
 }

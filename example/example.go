@@ -49,14 +49,12 @@ func main() {
 	ap := filepath.Dir(exe)
 	defaltConfig.AppPath = &ap
 
-	tfp := filepath.Join(*defaltConfig.AppPath, "/key/jwt.rsa.public")
-	defaltConfig.JWTKeyFilepath = &tfp
+	tfp := filepath.Join(*defaltConfig.AppPath, "/key/jwt.rsa.private")
+	defaltConfig.JWTKeyPath = &tfp
 	ri := time.Minute
 	defaltConfig.JWTAuthRemoveInterval = &ri
 	ti := time.Minute * 15
-	defaltConfig.JWTAuthTimeoutInterval = &ti
-	// default password validation: 8-32 characters, 1 lower case, 1 upper case, 1 special, 1 number.
-	defaltConfig.PasswordValidation = []string{`^[\S]{8,32}$`, `[a-z]`, `[A-Z]`, `[!#$%'()*+,-.\\/:;=?@\[\]^_{|}~]`, `[0-9]`}
+	defaltConfig.JWTAuthExpirationInterval = &ti
 	core.ConfigInit(defaltConfig, filepathsToDeleteOnReset)
 	var cnfg config.Config
 	if cnfg, err = config.Get(); err != nil {
@@ -65,22 +63,22 @@ func main() {
 	logh.Map[appName].Printf(logh.Info, "Config: %s", cnfg)
 
 	ac := authJWT.Config{
-		AppName:                *cnfg.AppName,
-		AuditLogName:           *cnfg.AuditLogName,
-		DataSourceName:         *cnfg.DataSourceName,
-		CreateRequiresAuth:     true,
-		JWTAuthRemoveInterval:  *cnfg.JWTAuthRemoveInterval,
-		JWTAuthTimeoutInterval: *cnfg.JWTAuthTimeoutInterval,
-		JWTKeyFilepath:         *cnfg.JWTKeyFilepath,
-		LogName:                *cnfg.LogName,
-		PasswordValidation:     cnfg.PasswordValidation,
-		PathCreate:             "/auth/create",
-		PathDelete:             "/auth/delete",
-		PathInfo:               "/auth/info",
-		PathLogin:              "/auth/login",
-		PathLogout:             "/auth/logout",
-		PathLogoutAll:          "/auth/logout-all",
-		PathRefresh:            "/auth/refresh",
+		AppName:                   *cnfg.AppName,
+		AuditLogName:              *cnfg.AuditLogName,
+		DataSourcePath:            *cnfg.DataSourcePath,
+		CreateRequiresAuth:        true,
+		JWTAuthRemoveInterval:     *cnfg.JWTAuthRemoveInterval,
+		JWTAuthExpirationInterval: *cnfg.JWTAuthExpirationInterval,
+		JWTKeyPath:                *cnfg.JWTKeyPath,
+		LogName:                   *cnfg.LogName,
+		PasswordValidation:        cnfg.PasswordValidation,
+		PathCreate:                "/auth/create",
+		PathDelete:                "/auth/delete",
+		PathInfo:                  "/auth/info",
+		PathLogin:                 "/auth/login",
+		PathLogout:                "/auth/logout",
+		PathLogoutAll:             "/auth/logout-all",
+		PathRefresh:               "/auth/refresh",
 	}
 	mux := http.NewServeMux()
 	core.OtherInit(ac, mux)

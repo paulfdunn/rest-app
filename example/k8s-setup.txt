@@ -119,7 +119,7 @@ kubectl get nodes
 ##############
 # HOST
 ##############
-scp -i ~/.ssh/pfd-ec2-main.pem ~/go/src/github.com/paulfdunn/example/*.yaml \
+scp -i ~/.ssh/pfd-ec2-main.pem ~/go/src/github.com/paulfdunn/rest-app/example/*.yaml \
     ubuntu@ec2-3-22-34-165.us-east-2.compute.amazonaws.com:~/
 
 ##############

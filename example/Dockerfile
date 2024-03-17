@@ -1,6 +1,6 @@
-# docker build -t paulfdunn/example:v0.0.0 .
+# docker build -t paulfdunn/rest-app/example:v0.0.0 .
 # docker login --username paulfdunn
-# docker push paulfdunn/example:v0.0.0
+# docker push paulfdunn/rest-app/example:v0.0.0
 # docker run --name example --network host -it example /bin/ash
 # docker container stop example
 # docker container rm example
@@ -9,8 +9,8 @@
 # 2 stage with Alpine - image size: 56MB
 ###########################################################################
 FROM golang:alpine as builder
-COPY ./ /go/src/github.com/paulfdunn/example
-WORKDIR /go/src/github.com/paulfdunn/example
+COPY ./ /go/src/github.com/paulfdunn/rest-app/example
+WORKDIR /go/src/github.com/paulfdunn/rest-app/example
 RUN go mod download
 #RUN go test -v ./... >test.log 2>&1
 # https://github.com/mattn/go-sqlite3#alpine
@@ -24,8 +24,8 @@ RUN apk --no-cache add curl
 RUN apk --no-cache add perl-utils
 EXPOSE 8000
 WORKDIR /app
-COPY --from=builder /go/src/github.com/paulfdunn/example/example /app/example
-COPY --from=builder /go/src/github.com/paulfdunn/example/key /app/key
+COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/example /app/example
+COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/key /app/key
 # DO NOT use "-log-filepath=" with Docker, just let it go to STDOUT.
 CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/opt/rest-app/data"]
 
@@ -35,8 +35,8 @@ CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/op
 ###########################################################################
 # FROM golang:1.16.3-buster AS builder
 # RUN apt-get update
-# COPY ./ /go/src/github.com/paulfdunn/example
-# WORKDIR /go/src/github.com/paulfdunn/example
+# COPY ./ /go/src/github.com/paulfdunn/rest-app/example
+# WORKDIR /go/src/github.com/paulfdunn/rest-app/example
 # RUN go mod download
 # #RUN go test -v ./... >test.log 2>&1
 # RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build
@@ -50,8 +50,8 @@ CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/op
 # RUN apt-get install -y perl
 # EXPOSE 8000
 # WORKDIR /app
-# COPY --from=builder /go/src/github.com/paulfdunn/example/example /app/example
-# COPY --from=builder /go/src/github.com/paulfdunn/example/key /app/key
+# COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/example /app/example
+# COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/key /app/key
 # DO NOT use "-log-filepath=" with Docker, just let it go to STDOUT.
 # CMD ["./example",  "-https-port=8000", "-log-level=0"]
 
@@ -61,8 +61,8 @@ CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/op
 
 # FROM golang:1.16.3-buster AS builder
 # RUN apt-get update
-# COPY ./ /go/src/github.com/paulfdunn/example
-# WORKDIR /go/src/github.com/paulfdunn/example
+# COPY ./ /go/src/github.com/paulfdunn/rest-app/example
+# WORKDIR /go/src/github.com/paulfdunn/rest-app/example
 # RUN go mod download
 #RUN go test -v ./... >test.log 2>&1
 # Was trying static linking for use with Alpine, but that has a linker error
@@ -80,8 +80,8 @@ CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/op
 # RUN apk --no-cache add perl-utils
 # EXPOSE 8000
 # WORKDIR /app
-# COPY --from=builder /go/src/github.com/paulfdunn/example/example /app/example
-# COPY --from=builder /go/src/github.com/paulfdunn/example/key /app/key
+# COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/example /app/example
+# COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/key /app/key
 # CMD ["./example",  "-https-port=8000", "-log-level=0", "-log-filepath=./example.log"]
 
 

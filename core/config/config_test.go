@@ -7,19 +7,19 @@ import (
 )
 
 var (
-	dataSourceName string
+	dataSourcePath string
 )
 
 func init() {
 	t := testing.T{}
 	testDir := t.TempDir()
-	dataSourceName = filepath.Join(testDir, "test.db")
+	dataSourcePath = filepath.Join(testDir, "test.db")
 }
 
 func TestSetGetDelete(t *testing.T) {
 	testSetup()
 
-	initializeKVInstance(dataSourceName)
+	initializeKVInstance(dataSourcePath)
 	value, err := kvi.Get(configKey)
 	if !(value == nil && err == nil) {
 		t.Error("Get to empty config should produce nil data and error.")
@@ -74,9 +74,9 @@ func TestSetGetDelete(t *testing.T) {
 func TestReset(t *testing.T) {
 	testSetup()
 
-	// Test dataSourceName delete
-	os.Create(dataSourceName)
-	if _, err := os.Stat(dataSourceName); os.IsNotExist(err) {
+	// Test dataSourcePath delete
+	os.Create(dataSourcePath)
+	if _, err := os.Stat(dataSourcePath); os.IsNotExist(err) {
 		t.Error("test delete db was not created")
 		return
 	}
@@ -106,12 +106,12 @@ func TestReset(t *testing.T) {
 		return
 	}
 
-	if err := resetIfRequested(true, dataSourceName, []string{killFileBase + "*"}); err != nil {
+	if err := resetIfRequested(true, dataSourcePath, []string{killFileBase + "*"}); err != nil {
 		t.Errorf("resetIfRequested error: %v", err)
 		return
 	}
 
-	if _, err := os.Stat(dataSourceName); err == nil {
+	if _, err := os.Stat(dataSourcePath); err == nil {
 		t.Error("test delete db was not deleted")
 		return
 	}
@@ -128,9 +128,9 @@ func TestReset(t *testing.T) {
 		return
 	}
 
-	// Init("test", dataSourceName, 1, 1000, 1, 1000, []string{killFile})
+	// Init("test", dataSourcePath, 1, 1000, 1, 1000, []string{killFile})
 }
 
 func testSetup() {
-	resetIfRequested(true, dataSourceName, []string{})
+	resetIfRequested(true, dataSourcePath, []string{})
 }
