@@ -1,4 +1,6 @@
 #!/bin/bash
+# This script will build and run the example app, then issue some curl
+# commands to the API.
 set -x
 
 function exitOnError {
@@ -26,8 +28,9 @@ if [[ $? != 0 ]]; then
     echo "FAILED: go build failed"
     exit
 fi
+# Run the app in the background.
 ./example  -https-port=8000 -log-level=0 -log-filepath=./example.log &
-# wait for app to start
+# Wait for app to start.
 sleep 5
 
 echo -e "\n\n Get admin token"

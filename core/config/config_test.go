@@ -20,7 +20,7 @@ func TestSetGetDelete(t *testing.T) {
 	testSetup()
 
 	initializeKVInstance(dataSourcePath)
-	value, err := kvi.Get(configKey)
+	value, err := configKVS.Get(configKey)
 	if !(value == nil && err == nil) {
 		t.Error("Get to empty config should produce nil data and error.")
 	}
@@ -63,7 +63,7 @@ func TestSetGetDelete(t *testing.T) {
 		t.Errorf("Error calling Delete, err:%v", err)
 		return
 	}
-	value, err = kvi.Get(configKey)
+	value, err = configKVS.Get(configKey)
 	if value != nil || err == nil {
 		t.Error("Get to empty config produced data or no error")
 		return

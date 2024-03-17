@@ -14,20 +14,20 @@ WORKDIR /go/src/github.com/paulfdunn/rest-app/example
 RUN go mod download
 #RUN go test -v ./... >test.log 2>&1
 # https://github.com/mattn/go-sqlite3#alpine
-RUN apk add --update gcc musl-dev
-RUN GOOS=linux GOARCH=amd64 go build
+# RUN apk add --update gcc musl-dev
+# RUN GOOS=linux GOARCH=arm64 go build
 
-FROM alpine:latest AS example
-RUN apk --no-cache add sqlite
-RUN apk --no-cache add curl
-# add perl-utils for json_pp
-RUN apk --no-cache add perl-utils
-EXPOSE 8000
-WORKDIR /app
-COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/example /app/example
-COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/key /app/key
-# DO NOT use "-log-filepath=" with Docker, just let it go to STDOUT.
-CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/opt/rest-app/data"]
+# FROM alpine:latest AS example
+# RUN apk --no-cache add sqlite
+# RUN apk --no-cache add curl
+# # add perl-utils for json_pp
+# RUN apk --no-cache add perl-utils
+# EXPOSE 8000
+# WORKDIR /app
+# COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/example /app/example
+# COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/key /app/key
+# # DO NOT use "-log-filepath=" with Docker, just let it go to STDOUT.
+# CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/opt/rest-app/data"]
 
 ###########################################################################
 # 2 stage with Ubuntu - image size: 178 MB
@@ -39,7 +39,7 @@ CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/op
 # WORKDIR /go/src/github.com/paulfdunn/rest-app/example
 # RUN go mod download
 # #RUN go test -v ./... >test.log 2>&1
-# RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build
+# RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build
 
 # # New stage to create application container
 # FROM ubuntu:latest AS example
@@ -67,7 +67,7 @@ CMD ["./example",  "-https-port=8000", "-log-level=0", "persistent-directory=/op
 #RUN go test -v ./... >test.log 2>&1
 # Was trying static linking for use with Alpine, but that has a linker error
 # RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags "-linkmode external -extldflags '-static' -s -w" -tags sqlite_omit_load_extension
-# RUN GOOS=linux GOARCH=amd64 go build
+# RUN GOOS=linux GOARCH=arm64 go build
 
 # New stage to create application container
 

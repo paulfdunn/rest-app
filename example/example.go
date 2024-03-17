@@ -25,6 +25,10 @@ const (
 )
 
 var (
+	// initial credentials
+	initialEmail    = "admin"
+	initialPassword = "P@ss!234"
+
 	filepathsToDeleteOnReset = []string{}
 )
 
@@ -39,52 +43,41 @@ func main() {
 	}()
 
 	an := appName
-	defaltConfig := config.Config{AppName: &an, LogName: &an}
+	inputConfig := config.Config{AppName: &an, LogName: &an}
 
 	// default to the executable path.
 	exe, err := os.Executable()
 	if err != nil {
 		log.Fatalf("fatal: %s fatal: Could not find executable path.", runtimeh.SourceInfo())
 	}
-	ap := filepath.Dir(exe)
-	defaltConfig.AppPath = &ap
+	appPath := filepath.Dir(exe)
 
-	tfp := filepath.Join(*defaltConfig.AppPath, "/key/jwt.rsa.private")
-	defaltConfig.JWTKeyPath = &tfp
-	ri := time.Minute
-	defaltConfig.JWTAuthRemoveInterval = &ri
-	ti := time.Minute * 15
-	defaltConfig.JWTAuthExpirationInterval = &ti
-	core.ConfigInit(defaltConfig, filepathsToDeleteOnReset)
-	var cnfg config.Config
-	if cnfg, err = config.Get(); err != nil {
+	privateKeyPath := filepath.Join(appPath, "/key/jwt.rsa.private")
+	jwtRemovalInterval := time.Minute
+	jwtExpirationInterval := time.Minute * 15
+	core.ConfigInit(inputConfig, filepathsToDeleteOnReset)
+	var runtimConfig config.Config
+	if runtimConfig, err = config.Get(); err != nil {
 		log.Fatalf("fatal: %s getting running config, error:%v", runtimeh.SourceInfo(), err)
 	}
-	logh.Map[appName].Printf(logh.Info, "Config: %s", cnfg)
+	logh.Map[appName].Printf(logh.Info, "Config: %s", runtimConfig)
 
 	ac := authJWT.Config{
-		AppName:                   *cnfg.AppName,
-		AuditLogName:              *cnfg.AuditLogName,
-		DataSourcePath:            *cnfg.DataSourcePath,
+		AppName:                   *runtimConfig.AppName,
+		AuditLogName:              *runtimConfig.AuditLogName,
+		DataSourcePath:            *runtimConfig.DataSourcePath,
 		CreateRequiresAuth:        true,
-		JWTAuthRemoveInterval:     *cnfg.JWTAuthRemoveInterval,
-		JWTAuthExpirationInterval: *cnfg.JWTAuthExpirationInterval,
-		JWTKeyPath:                *cnfg.JWTKeyPath,
-		LogName:                   *cnfg.LogName,
-		PasswordValidation:        cnfg.PasswordValidation,
-		PathCreate:                "/auth/create",
-		PathDelete:                "/auth/delete",
-		PathInfo:                  "/auth/info",
-		PathLogin:                 "/auth/login",
-		PathLogout:                "/auth/logout",
-		PathLogoutAll:             "/auth/logout-all",
-		PathRefresh:               "/auth/refresh",
+		JWTAuthRemoveInterval:     jwtRemovalInterval,
+		JWTAuthExpirationInterval: jwtExpirationInterval,
+		JWTKeyPath:                privateKeyPath,
+		LogName:                   *runtimConfig.LogName,
 	}
 	mux := http.NewServeMux()
-	core.OtherInit(ac, mux)
-	if *cnfg.NewDataSource {
-		initDataSource()
+	var initialCreds authJWT.Credential
+	if *runtimConfig.DataSourceIsNew {
+		initialCreds = authJWT.Credential{Email: &initialEmail, Password: &initialPassword}
 	}
+	core.OtherInit(&ac, mux, &initialCreds)
 
 	// Registering with the trailing slash means the naked path is redirected to this path.
 	path := "/"
@@ -92,22 +85,10 @@ func main() {
 	logh.Map[appName].Printf(logh.Info, "Registered handler: %s\n", path)
 
 	// blocking call
-	cfp := filepath.Join(*defaltConfig.AppPath, "/key/rest-app.crt")
-	kfp := filepath.Join(*defaltConfig.AppPath, "/key/rest-app.key")
-	core.ListenAndServeTLS(appName, mux, fmt.Sprintf(":%d", *cnfg.HTTPSPort),
+	cfp := filepath.Join(appPath, "/key/rest-app.crt")
+	kfp := filepath.Join(appPath, "/key/rest-app.key")
+	core.ListenAndServeTLS(appName, mux, fmt.Sprintf(":%d", *runtimConfig.HTTPSPort),
 		10*time.Second, 10*time.Second, cfp, kfp)
-}
-
-// initDataSource - Create a default login.
-func initDataSource() {
-	// Create default auth
-	em := "admin"
-	pw := "P@ss!234"
-	cred := authJWT.Credential{Email: &em, Password: &pw}
-	if err := cred.AuthCreate(); err != nil {
-		log.Fatalf("fatal: %s creating default account, error: %v", runtimeh.SourceInfo(), err)
-	}
-	logh.Map[appName].Printf(logh.Info, "Created default auth: %s\n", em)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {

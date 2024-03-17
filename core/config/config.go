@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/paulfdunn/go-helper/databaseh/kvs"
 	"github.com/paulfdunn/go-helper/logh"
@@ -18,23 +17,32 @@ import (
 
 type Config struct {
 	// CLI parameters
-	HTTPSPort   *int    `json:",omitempty"`
+	// HTTPSPort - see CLI help for description.
+	HTTPSPort *int `json:",omitempty"`
+	// LogFilepath - see CLI help for description.
 	LogFilepath *string `json:",omitempty"`
-	LogLevel    *int    `json:",omitempty"`
+	// LogLevel - see CLI help for description.
+	LogLevel *int `json:",omitempty"`
+	// PersistentDirectory - see CLI help for description.
+	PersistentDirectory *string `json:",omitempty"`
 
 	// Other
-	AppName                   *string        `json:",omitempty"`
-	AppPath                   *string        `json:",omitempty"`
-	AuditLogName              *string        `json:",omitempty"`
-	DataSourcePath            *string        `json:",omitempty"`
-	JWTKeyPath                *string        `json:",omitempty"`
-	JWTAuthRemoveInterval     *time.Duration `json:",omitempty"`
-	JWTAuthExpirationInterval *time.Duration `json:",omitempty"`
-	LogName                   *string        `json:",omitempty"`
-	NewDataSource             *bool          `json:",omitempty"`
-	PasswordValidation        []string       `json:",omitempty"`
-	PersistentDirectory       *string        `json:",omitempty"`
-	Version                   *string        `json:",omitempty"`
+	// AppName is used to populate the Issuer field of the JWT Claims and will be used
+	// as the file name, prefix '.db', for the persistent data source.
+	AppName *string `json:",omitempty"`
+	// AuditLogName is the name used for the logh audit log; defaults to LogName + ".audit"
+	AuditLogName *string `json:",omitempty"`
+	// DataSourceIsNew is an output of calling Init and indicates that there was no file
+	// at DataSourcePath. This can be used by the calling application to perform other initialization
+	// of the data source.
+	DataSourceIsNew *bool `json:",omitempty"`
+	// DataSourcePath is the path to the config data source;
+	// DataSourcePath = filepath.Join(*persistentDirectory, *cnfg.AppName+".db")
+	DataSourcePath *string `json:",omitempty"`
+	// LogName is the name of the logh log to use.
+	LogName *string `json:",omitempty"`
+	// Version is for application version information.
+	Version *string `json:",omitempty"`
 }
 
 const (
@@ -42,10 +50,10 @@ const (
 )
 
 var (
-	// DefaultConfig are the default configuration parameters. These come from flags and/or the application
-	// during Init.
+	// DefaultConfig are the default configuration parameters. These come from flags or get
+	// set during Init.
 	DefaultConfig Config
-	kvi           kvs.KVS
+	configKVS     kvs.KVS
 )
 
 // flags for CLI
@@ -64,18 +72,31 @@ var (
 // checkLogSizeAudit/maxLogSizeAudit - logh parameters for the audit log.
 // filepathsToDeleteOnReset - fully qualified file paths for any files that needs deleted on
 // application reset. Uses Glob patterns.
-func Init(cnfg Config, checkLogSize int, maxLogSize int64,
+// The only required config inputs are: AppName (used to populate the Issuer field of the JWT
+// Claims) and LogName.
+//
+// Init creates the DefaultConfig from the initConfig by adding values from parsing CLI parameters,
+// and filling in defaults for Config members without values. The caller can then call Get()
+// to merge any saved configuration data into the default data. That configuration can be
+// modified at runtime, and saved using Set(), or deleted using Delete()
+func Init(initConfig Config, checkLogSize int, maxLogSize int64,
 	checkLogSizeAudit int, maxLogSizeAudit int64, filepathsToDeleteOnReset []string) {
 
 	var err error
 	flag.Parse()
 
-	if cnfg.AppName == nil || cnfg.AppPath == nil || cnfg.LogName == nil {
-		log.Fatalf("fatal: cnfg.AppName, cnf.AppPath, and cnfg.LogName are required to be non-nil.")
+	if initConfig.AppName == nil || initConfig.LogName == nil {
+		log.Fatalf("fatal: initConfig.AppName and initConfig.LogName are required to be non-nil.")
 	}
 
 	if *persistentDirectory == "" {
-		persistentDirectory = cnfg.AppPath
+		// default to the executable path.
+		exe, err := os.Executable()
+		if err != nil {
+			log.Fatalf("fatal: %s fatal: Could not find executable path.", runtimeh.SourceInfo())
+		}
+		ap := filepath.Dir(exe)
+		persistentDirectory = &ap
 	}
 
 	if *persistentDirectory != "" {
@@ -84,10 +105,10 @@ func Init(cnfg Config, checkLogSize int, maxLogSize int64,
 		}
 	}
 
-	dataSourcePath := filepath.Join(*persistentDirectory, *cnfg.AppName+".db")
-	newDataSource := false
+	dataSourcePath := filepath.Join(*persistentDirectory, *initConfig.AppName+".db")
+	dataSourceIsNew := false
 	if _, err := os.Stat(dataSourcePath); os.IsNotExist(err) {
-		newDataSource = true
+		dataSourceIsNew = true
 	}
 
 	// reset if requested - do PRIOR to logging setup as logs are deleted.
@@ -96,45 +117,50 @@ func Init(cnfg Config, checkLogSize int, maxLogSize int64,
 	}
 
 	// logging setup
-	err = logh.New(*cnfg.LogName, *logFilepath, logh.DefaultLevels, logh.LoghLevel(*logLevel),
+	err = logh.New(*initConfig.LogName, *logFilepath, logh.DefaultLevels, logh.LoghLevel(*logLevel),
 		logh.DefaultFlags, checkLogSize, maxLogSize)
 	if err != nil {
 		log.Fatalf("fatal: %s error creating log, error: %v", runtimeh.SourceInfo(), err)
 	}
-	var auditLogName, auditLogFilepath string
-	if *logFilepath != "" {
-		auditLogName = *cnfg.AuditLogName + ".audit"
+	var auditLogFilepath string
+	if logFilepath != nil {
 		auditLogFilepath = *logFilepath + ".audit"
 	}
-	err = logh.New(auditLogName, auditLogFilepath, logh.DefaultLevels, logh.Audit,
+	if initConfig.AuditLogName == nil {
+		aln := *initConfig.LogName + ".audit"
+		initConfig.AuditLogName = &aln
+	}
+	err = logh.New(*initConfig.AuditLogName, auditLogFilepath, logh.DefaultLevels, logh.Audit,
 		logh.DefaultFlags, checkLogSizeAudit, maxLogSizeAudit)
 	if err != nil {
 		log.Fatalf("fatal: %s error creating audit log, error: %v", runtimeh.SourceInfo(), err)
 	}
-	logh.Map[*cnfg.LogName].Printf(logh.Info, "%s is starting....", *cnfg.LogName)
-	logh.Map[auditLogName].Printf(logh.Audit, "%s is starting....", *cnfg.LogName)
-	logh.Map[*cnfg.LogName].Printf(logh.Info, "logFilepath:%s", *logFilepath)
-	logh.Map[*cnfg.LogName].Printf(logh.Info, "auditLogFilepath:%s", auditLogFilepath)
+	logh.Map[*initConfig.LogName].Printf(logh.Info, "%s is starting....", *initConfig.LogName)
+	logh.Map[*initConfig.AuditLogName].Printf(logh.Audit, "%s is starting....", *initConfig.LogName)
+	logh.Map[*initConfig.LogName].Printf(logh.Info, "logFilepath:%s", *logFilepath)
+	logh.Map[*initConfig.LogName].Printf(logh.Info, "auditLogFilepath:%s", auditLogFilepath)
 
 	initializeKVInstance(dataSourcePath)
 
-	DefaultConfig = cnfg
+	DefaultConfig = initConfig
 	// CLI
 	DefaultConfig.HTTPSPort = httpsPort
 	DefaultConfig.LogFilepath = logFilepath
 	DefaultConfig.LogLevel = logLevel
 	DefaultConfig.PersistentDirectory = persistentDirectory
 	// Other
-	DefaultConfig.AppName = cnfg.AppName
-	DefaultConfig.AuditLogName = &auditLogName
+	DefaultConfig.AppName = initConfig.AppName
+	DefaultConfig.AuditLogName = initConfig.AuditLogName
+	DefaultConfig.DataSourceIsNew = &dataSourceIsNew
 	DefaultConfig.DataSourcePath = &dataSourcePath
-	DefaultConfig.LogName = cnfg.LogName
-	DefaultConfig.NewDataSource = &newDataSource
+	DefaultConfig.LogName = initConfig.LogName
+	DefaultConfig.Version = initConfig.Version
 }
 
-// Set persists the provided Configuration.
+// Set persists the provided Configuration. This can be called dynamically to store application state.
+// Any stored state will override default configuration.
 func (cnfg *Config) Set() error {
-	return runtimeh.SourceInfoError("", kvi.Serialize(configKey, cnfg))
+	return runtimeh.SourceInfoError("", configKVS.Serialize(configKey, cnfg))
 }
 
 func (cnfg Config) String() string {
@@ -144,18 +170,19 @@ func (cnfg Config) String() string {
 
 // Delete will remove the stored configuration by deleting the KVS store.
 func Delete() error {
-	return runtimeh.SourceInfoError("", kvi.DeleteStore())
+	return runtimeh.SourceInfoError("", configKVS.DeleteStore())
 }
 
 // Get returns the current configuration. The current configuration is based on default/CLI values,
 // but those may be overriden by saved values.
 func Get() (Config, error) {
 	mergedConfig := DefaultConfig
-	err := kvi.Deserialize(configKey, &mergedConfig)
+	err := configKVS.Deserialize(configKey, &mergedConfig)
 	return mergedConfig, runtimeh.SourceInfoError("", err)
 }
 
-// resetIfRequested - delete all application data if reset == true.
+// resetIfRequested - delete all configuration and log data if reset == true.
+// filepathsToDeleteOnReset is a slice of glob patterns; all specified files will be deleted.
 func resetIfRequested(reset bool, dataSourcePath string, filepathsToDeleteOnReset []string) error {
 	var errOut error
 	if reset {
@@ -188,7 +215,7 @@ func resetIfRequested(reset bool, dataSourcePath string, filepathsToDeleteOnRese
 func initializeKVInstance(dataSourcePath string) {
 	var err error
 	// The KVS table name and key will both use configKey.
-	if kvi, err = kvs.New(dataSourcePath, configKey); err != nil {
+	if configKVS, err = kvs.New(dataSourcePath, configKey); err != nil {
 		log.Fatalf("fatal: %s could not create New kvs, error: %v", runtimeh.SourceInfo(), err)
 	}
 }
