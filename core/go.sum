@@ -2,8 +2,8 @@ github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumC
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/mattn/go-sqlite3 v1.14.22 h1:2gZY6PC6kBnID23Tichd1K+Z0oS6nE/XwU+Vz/5o4kU=
 github.com/mattn/go-sqlite3 v1.14.22/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
-github.com/paulfdunn/authJWT v1.0.4 h1:jjDmGlh6g5RkpT5H89BjCaIL+Yh7D3QtK39q2WE7+bw=
-github.com/paulfdunn/authJWT v1.0.4/go.mod h1:eq1gC9s1g5YpMJCKSVHRdhxvGIxXs8cnxuAEZ24r70A=
+github.com/paulfdunn/authJWT v1.0.6 h1:6YlHhDkh9+MxKSPa6M2Rll5UXowt/ju4WzCOLGWMZiU=
+github.com/paulfdunn/authJWT v1.0.6/go.mod h1:eq1gC9s1g5YpMJCKSVHRdhxvGIxXs8cnxuAEZ24r70A=
 github.com/paulfdunn/go-helper/databaseh v1.0.7 h1:4m8gaaB+4WyosZ74JWDWcr4BwIiFPWzF/+M58X0jpIA=
 github.com/paulfdunn/go-helper/databaseh v1.0.7/go.mod h1:06j/yIxuUbwhSUVNMLPoqJe/VRji1++rLI8fH4HrxZk=
 github.com/paulfdunn/go-helper/logh v1.0.7 h1:juGvtXPs6hCwkiY1bk435lZ4/r3sMB2xYfkcQnIUoHE=
@@ -12,7 +12,5 @@ github.com/paulfdunn/go-helper/neth v1.0.9 h1:BliGDCqDCNKUz/G9suGAPtWhAhnQaFEAU4
 github.com/paulfdunn/go-helper/neth v1.0.9/go.mod h1:CAAStuHiFbz/vAZKciTZSwFULa0+TmjOD5wCZj22iDM=
 github.com/paulfdunn/go-helper/osh v1.0.10 h1:OM5Pph0OZmBckAeRhTOtaB0YMENo9LbAUwsLc2C7DZk=
 github.com/paulfdunn/go-helper/osh v1.0.10/go.mod h1:fxQ/0oHwpkKqGOWu0rGRvWGFU2B7kiXq8Mux/1E2LXE=
-github.com/paulfdunn/rest-app/core/config v0.0.0-20240316222358-a8b4fa2431b7 h1:zPooXqc5KlTxRKb81OLBDFnaZ9FkQdjy86PbufxY+a4=
-github.com/paulfdunn/rest-app/core/config v0.0.0-20240316222358-a8b4fa2431b7/go.mod h1:9mjy1fCACD3+W8IYoEfY4xbr6eW95Hi5BY4h7DRlWpg=
 golang.org/x/crypto v0.21.0 h1:X31++rzVUdKhX5sWmSOFZxx8UW/ldWx55cbf08iNAMA=
 golang.org/x/crypto v0.21.0/go.mod h1:0BP7YvVV9gBbVKyeTG0Gyn+gZm94bibOW5BjDEYAOMs=

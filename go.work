@@ -3,6 +3,5 @@ go 1.21.7
 use (
     .
     ./core
-    ./core/config
     ./example
 )
