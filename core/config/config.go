@@ -85,6 +85,26 @@ func Init(initConfig Config, checkLogSize int, maxLogSize int64,
 	var err error
 	flag.Parse()
 
+	// logging setup
+	err = logh.New(*initConfig.LogName, *logFilepath, logh.DefaultLevels, logh.LoghLevel(*logLevel),
+		logh.DefaultFlags, checkLogSize, maxLogSize)
+	if err != nil {
+		log.Fatalf("fatal: %s error creating log, error: %v", runtimeh.SourceInfo(), err)
+	}
+	var auditLogFilepath string
+	if logFilepath != nil {
+		auditLogFilepath = *logFilepath + ".audit"
+	}
+	if initConfig.AuditLogName == nil {
+		aln := *initConfig.LogName + ".audit"
+		initConfig.AuditLogName = &aln
+	}
+	err = logh.New(*initConfig.AuditLogName, auditLogFilepath, logh.DefaultLevels, logh.Audit,
+		logh.DefaultFlags, checkLogSizeAudit, maxLogSizeAudit)
+	if err != nil {
+		log.Fatalf("fatal: %s error creating audit log, error: %v", runtimeh.SourceInfo(), err)
+	}
+
 	if initConfig.AppName == nil || initConfig.LogName == nil {
 		log.Fatalf("fatal: initConfig.AppName and initConfig.LogName are required to be non-nil.")
 	}
@@ -106,35 +126,18 @@ func Init(initConfig Config, checkLogSize int, maxLogSize int64,
 	}
 
 	dataSourcePath := filepath.Join(*persistentDirectory, *initConfig.AppName+".db")
-	dataSourceIsNew := false
-	if _, err := os.Stat(dataSourcePath); os.IsNotExist(err) {
-		dataSourceIsNew = true
-	}
 
 	// reset if requested - do PRIOR to logging setup as logs are deleted.
 	if err = resetIfRequested(*reset, dataSourcePath, filepathsToDeleteOnReset); err != nil {
 		log.Fatalf("fatal: %s resetIfRequested error: %v", runtimeh.SourceInfo(), err)
 	}
 
-	// logging setup
-	err = logh.New(*initConfig.LogName, *logFilepath, logh.DefaultLevels, logh.LoghLevel(*logLevel),
-		logh.DefaultFlags, checkLogSize, maxLogSize)
-	if err != nil {
-		log.Fatalf("fatal: %s error creating log, error: %v", runtimeh.SourceInfo(), err)
+	dataSourceIsNew := false
+	if _, err := os.Stat(dataSourcePath); os.IsNotExist(err) {
+		logh.Map[*initConfig.LogName].Printf(logh.Info, "dataSourceIsNew = true")
+		dataSourceIsNew = true
 	}
-	var auditLogFilepath string
-	if logFilepath != nil {
-		auditLogFilepath = *logFilepath + ".audit"
-	}
-	if initConfig.AuditLogName == nil {
-		aln := *initConfig.LogName + ".audit"
-		initConfig.AuditLogName = &aln
-	}
-	err = logh.New(*initConfig.AuditLogName, auditLogFilepath, logh.DefaultLevels, logh.Audit,
-		logh.DefaultFlags, checkLogSizeAudit, maxLogSizeAudit)
-	if err != nil {
-		log.Fatalf("fatal: %s error creating audit log, error: %v", runtimeh.SourceInfo(), err)
-	}
+
 	logh.Map[*initConfig.LogName].Printf(logh.Info, "%s is starting....", *initConfig.LogName)
 	logh.Map[*initConfig.AuditLogName].Printf(logh.Audit, "%s is starting....", *initConfig.LogName)
 	logh.Map[*initConfig.LogName].Printf(logh.Info, "logFilepath:%s", *logFilepath)

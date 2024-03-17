@@ -2,6 +2,10 @@ module github.com/paulfdunn/rest-app/example
 
 go 1.21.7
 
+replace (
+	// github.com/paulfdunn/rest-app/core => /Users/pauldunn/go/src/github.com/paulfdunn/rest-app/core
+)
+
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect

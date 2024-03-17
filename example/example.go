@@ -73,11 +73,11 @@ func main() {
 		LogName:                   *runtimConfig.LogName,
 	}
 	mux := http.NewServeMux()
-	var initialCreds authJWT.Credential
+	var initialCreds *authJWT.Credential
 	if *runtimConfig.DataSourceIsNew {
-		initialCreds = authJWT.Credential{Email: &initialEmail, Password: &initialPassword}
+		initialCreds = &authJWT.Credential{Email: &initialEmail, Password: &initialPassword}
 	}
-	core.OtherInit(&ac, mux, &initialCreds)
+	core.OtherInit(&ac, mux, initialCreds)
 
 	// Registering with the trailing slash means the naked path is redirected to this path.
 	path := "/"
