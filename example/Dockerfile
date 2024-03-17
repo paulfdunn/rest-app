@@ -1,7 +1,7 @@
-# docker build -t paulfdunn/rest-app/example:v0.0.0 .
+# docker build -t rest-app/example:v0.0.0 .
 # docker login --username paulfdunn
 # docker push paulfdunn/rest-app/example:v0.0.0
-# docker run --name example --network host -it example /bin/ash
+# docker run --name example --network host -it rest-app/example:v0.0.0 /bin/ash
 # docker container stop example
 # docker container rm example
 
