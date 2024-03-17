@@ -14,5 +14,7 @@ github.com/paulfdunn/go-helper/osh v1.0.11 h1:MXUsuT4juL/7zj6pb4opzJv2jFBnN6c641
 github.com/paulfdunn/go-helper/osh v1.0.11/go.mod h1:fxQ/0oHwpkKqGOWu0rGRvWGFU2B7kiXq8Mux/1E2LXE=
 github.com/paulfdunn/rest-app/core v1.0.2 h1:uH5q2Zp+xzZwKDMXwlRfDa9sDBdGz+GUvpasTgKwVjQ=
 github.com/paulfdunn/rest-app/core v1.0.2/go.mod h1:Ej+z5zdtOaEA5Sqt4exTEIXOCe8q4lXj42233AdeUsc=
+github.com/paulfdunn/rest-app/core v1.0.3 h1:NH0KKR1PSVR2tr5VURuEkq7EpcHp3R/3cAgc3/5FLDY=
+github.com/paulfdunn/rest-app/core v1.0.3/go.mod h1:Ej+z5zdtOaEA5Sqt4exTEIXOCe8q4lXj42233AdeUsc=
 golang.org/x/crypto v0.21.0 h1:X31++rzVUdKhX5sWmSOFZxx8UW/ldWx55cbf08iNAMA=
 golang.org/x/crypto v0.21.0/go.mod h1:0BP7YvVV9gBbVKyeTG0Gyn+gZm94bibOW5BjDEYAOMs=
