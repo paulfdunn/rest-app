@@ -55,4 +55,4 @@ WORKDIR /app
 COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/example /app/example
 COPY --from=builder /go/src/github.com/paulfdunn/rest-app/example/key /app/key
 # DO NOT use "-log-filepath=" with Docker, just let it go to STDOUT.
-CMD ["./example",  "-https-port=8000", "-log-level=0"]
+CMD ["./example",  "-https-port=8000", "-log-level=0", "-log-filepath=./example.log"]
