@@ -81,6 +81,6 @@ if [[ $HTTP_STATUS != 204 ]]; then
 fi
 
 echo -e "\n\ncleanup and exit"
-# cleanup
+cleanup
 
 echo "PASSED: $ME"

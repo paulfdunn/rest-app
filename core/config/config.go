@@ -67,7 +67,8 @@ var (
 		"includes user accounts, settings, log files, etc.")
 )
 
-// Init initializes the configuration and logging for the application.
+// Init initializes the configuration and logging for the application; calls flag.Parse().
+// Applicaitons should not call flag.Parse() as flag.Parse() can only be called once per application.
 // checkLogSize/maxLogSize - logh parameters for the application log.
 // checkLogSizeAudit/maxLogSizeAudit - logh parameters for the audit log.
 // filepathsToDeleteOnReset - fully qualified file paths for any files that needs deleted on

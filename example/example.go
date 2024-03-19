@@ -20,11 +20,11 @@ import (
 	"github.com/paulfdunn/rest-app/core/config"
 )
 
-const (
-	appName = "example"
-)
-
 var (
+	appName = "example"
+	lp      func(level logh.LoghLevel, v ...interface{})
+	lpf     func(level logh.LoghLevel, format string, v ...interface{})
+
 	// initial credentials
 	initialEmail    = "admin"
 	initialPassword = "P@ss!234"
@@ -37,13 +37,19 @@ func main() {
 		if err := recover(); err != nil {
 			errOut := fmt.Sprintf("panic: %+v\n%+v", err, string(debug.Stack()))
 			fmt.Println(errOut)
-			logh.Map[appName].Println(logh.Error, errOut)
-			logh.ShutdownAll()
+			lp(logh.Error, errOut)
+			err = logh.ShutdownAll()
+			if err != nil {
+				fmt.Printf("logh.ShutdownAll error:%+v", errOut)
+			}
 		}
 	}()
 
-	an := appName
-	inputConfig := config.Config{AppName: &an, LogName: &an}
+	// flag.Parse() is called by config.Config; apps should not call flag.Parse()
+	inputConfig := config.Config{AppName: &appName, LogName: &appName}
+
+	lp = logh.Map[appName].Println
+	lpf = logh.Map[appName].Printf
 
 	// default to the executable path.
 	exe, err := os.Executable()
@@ -60,7 +66,7 @@ func main() {
 	if runtimConfig, err = config.Get(); err != nil {
 		log.Fatalf("fatal: %s getting running config, error:%v", runtimeh.SourceInfo(), err)
 	}
-	logh.Map[appName].Printf(logh.Info, "Config: %s", runtimConfig)
+	lpf(logh.Info, "Config: %s", runtimConfig)
 
 	ac := authJWT.Config{
 		AppName:                   *runtimConfig.AppName,
@@ -82,7 +88,7 @@ func main() {
 	// Registering with the trailing slash means the naked path is redirected to this path.
 	path := "/"
 	mux.HandleFunc(path, authJWT.HandlerFuncAuthJWTWrapper(handler))
-	logh.Map[appName].Printf(logh.Info, "Registered handler: %s\n", path)
+	lpf(logh.Info, "Registered handler: %s\n", path)
 
 	// blocking call
 	cfp := filepath.Join(appPath, "/key/rest-app.crt")
@@ -92,11 +98,14 @@ func main() {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	logh.Map[appName].Printf(logh.Info, "rest-app handler %v\n", *r)
+	lpf(logh.Info, "rest-app handler %v\n", *r)
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown"
-		logh.Map[appName].Printf(logh.Error, "hostname error: %v\n", err)
+		lpf(logh.Error, "hostname error: %v\n", err)
 	}
-	w.Write([]byte(fmt.Sprintf("hostname: %s, rest-app - from github.com/paulfdunn/rest-app", hostname)))
+	_, err = w.Write([]byte(fmt.Sprintf("hostname: %s, rest-app - from github.com/paulfdunn/rest-app", hostname)))
+	if err != nil {
+		lpf(logh.Error, "hostname error: %v\n", err)
+	}
 }

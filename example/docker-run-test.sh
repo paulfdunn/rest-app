@@ -7,18 +7,13 @@ set -x
 function cleanup {
 docker container stop example
 docker container rm example
-docker network rm restNet
 }
 
 cleanup
 
 docker build -t rest-app/example:v0.0.0 .
 
-docker network inspect restNet
-if [[ $? != 0 ]]; then
-    docker network create restNet -d bridge
-fi
-docker run -p 127.0.0.1:8000:8000/tcp -d --hostname example --name example --network restNet rest-app/example:v0.0.0
+docker run -p 127.0.0.1:8000:8000/tcp -d --hostname example --name example rest-app/example:v0.0.0
 
 # Give time for the container to start.
 sleep 5
