@@ -60,7 +60,7 @@ fi
 echo -e "\n\n Create a user."
 HTTP_STATUS=$(curl -k -s -w "\n|HTTP_STATUS=%{http_code}|\n" -d '{"Email":"user", "Password":"P@ss!234"}'\
     -H "Authorization: Bearer $TOKEN_ADMIN" \
-    https://127.0.0.1:8000/auth/create/ | \
+    https://127.0.0.1:8000/auth/createorupdate/ | \
     grep HTTP_STATUS | grep -o -E [0-9]*)
 if [[ $HTTP_STATUS != 201 ]]; then
     echo "user create failed"
@@ -79,6 +79,9 @@ if [[ $HTTP_STATUS != 204 ]]; then
     echo "user delete failed"
     exitOnError
 fi
+
+cat example.log.0
+cat example.log.audit.0
 
 echo -e "\n\ncleanup and exit"
 cleanup
