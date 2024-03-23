@@ -71,8 +71,10 @@ var (
 // Applicaitons should not call flag.Parse() as flag.Parse() can only be called once per application.
 // checkLogSize/maxLogSize - logh parameters for the application log.
 // checkLogSizeAudit/maxLogSizeAudit - logh parameters for the audit log.
-// filepathsToDeleteOnReset - fully qualified file paths for any files that needs deleted on
-// application reset. Uses Glob patterns.
+// filepathsToDeleteOnReset - fully qualified file paths for any files that need deleted on
+//
+//	application reset via CLI parameter. Uses Glob patterns.
+//
 // The only required config inputs are: AppName (used to populate the Issuer field of the JWT
 // Claims) and LogName.
 //

@@ -47,7 +47,7 @@ if [[ $HTTP_STATUS != 401 ]]; then
     exitOnError
 fi
 
-echo -e "\n\n Try again providing the token and get a 200."
+echo -e "\n\n Get the root path using the admin token and get a 200."
 HTTP_STATUS=$(curl -k -s -w "\n|HTTP_STATUS=%{http_code}|\n" \
     -H "Authorization: Bearer $TOKEN_ADMIN" \
     https://127.0.0.1:8000/ | \
