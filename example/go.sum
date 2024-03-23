@@ -10,6 +10,8 @@ github.com/paulfdunn/authJWT v1.0.11 h1:JY0m7F6e6tVLDEZgGN2EFVB8YXK0uw6zcgG5V/0F
 github.com/paulfdunn/authJWT v1.0.11/go.mod h1:ywNltRCfTS/7i5Gnu7ZyYjgh5hKPvJ8uuEEDWGEgNs0=
 github.com/paulfdunn/authJWT v1.0.12 h1:/AiPsm6AxHNiUBCJTNZmlD/tnevw6arcWGGBA5bnFho=
 github.com/paulfdunn/authJWT v1.0.12/go.mod h1:ywNltRCfTS/7i5Gnu7ZyYjgh5hKPvJ8uuEEDWGEgNs0=
+github.com/paulfdunn/authJWT v1.0.13 h1:OSMvXTILoUvznAFFja05F4prwRDzzKgTHwIH/r6DlXo=
+github.com/paulfdunn/authJWT v1.0.13/go.mod h1:ywNltRCfTS/7i5Gnu7ZyYjgh5hKPvJ8uuEEDWGEgNs0=
 github.com/paulfdunn/go-helper/databaseh v1.0.8 h1:o3BL+JaABLMm8+RqqrDc07tnvv4c6bRlfHsh00lpqIs=
 github.com/paulfdunn/go-helper/databaseh v1.0.8/go.mod h1:atASADDIkX0xEB3PQ3rdOKnSliaRfftRZ+gk3yWtomY=
 github.com/paulfdunn/go-helper/databaseh v1.4.7 h1:HW1ZzP1JnFi28G2Dsy3OyQpL9qZlFr7Rxx2Dofn30DA=
@@ -30,5 +32,7 @@ github.com/paulfdunn/rest-app/core v1.0.2 h1:uH5q2Zp+xzZwKDMXwlRfDa9sDBdGz+GUvpa
 github.com/paulfdunn/rest-app/core v1.0.2/go.mod h1:Ej+z5zdtOaEA5Sqt4exTEIXOCe8q4lXj42233AdeUsc=
 github.com/paulfdunn/rest-app/core v1.0.3 h1:NH0KKR1PSVR2tr5VURuEkq7EpcHp3R/3cAgc3/5FLDY=
 github.com/paulfdunn/rest-app/core v1.0.3/go.mod h1:Ej+z5zdtOaEA5Sqt4exTEIXOCe8q4lXj42233AdeUsc=
+github.com/paulfdunn/rest-app/core v1.0.4 h1:do6f6tpy6v+2WE5ZwTuqsqlt86UjJuB4UappGR6aqtY=
+github.com/paulfdunn/rest-app/core v1.0.4/go.mod h1:i+JsVDpms7aCbsvrFHsF3aKwnCPqSMN24UQqrtk+j9U=
 golang.org/x/crypto v0.21.0 h1:X31++rzVUdKhX5sWmSOFZxx8UW/ldWx55cbf08iNAMA=
 golang.org/x/crypto v0.21.0/go.mod h1:0BP7YvVV9gBbVKyeTG0Gyn+gZm94bibOW5BjDEYAOMs=

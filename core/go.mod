@@ -3,7 +3,7 @@ module github.com/paulfdunn/rest-app/core
 go 1.21.8
 
 require (
-	github.com/paulfdunn/authJWT v1.0.12
+	github.com/paulfdunn/authJWT v1.0.13
 	github.com/paulfdunn/go-helper/databaseh v1.4.7
 	github.com/paulfdunn/go-helper/logh v1.3.7
 	github.com/paulfdunn/go-helper/osh v1.3.7
