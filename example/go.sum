@@ -36,5 +36,7 @@ github.com/paulfdunn/rest-app/core v1.0.4 h1:do6f6tpy6v+2WE5ZwTuqsqlt86UjJuB4Uap
 github.com/paulfdunn/rest-app/core v1.0.4/go.mod h1:i+JsVDpms7aCbsvrFHsF3aKwnCPqSMN24UQqrtk+j9U=
 github.com/paulfdunn/rest-app/core v1.0.5 h1:46st7hPR+wSDxK/uLIWqUZFdOa/4xvcE9edcyS7Kd18=
 github.com/paulfdunn/rest-app/core v1.0.5/go.mod h1:4FjuncvRiZFN9qLG51EtJkeoCzXudndSqnV7WbW6r7g=
+github.com/paulfdunn/rest-app/core v1.0.6 h1:s5LVUU2bXnRDJNrFIiKz4bXGfu/TURXA8K3hDae/LAw=
+github.com/paulfdunn/rest-app/core v1.0.6/go.mod h1:4FjuncvRiZFN9qLG51EtJkeoCzXudndSqnV7WbW6r7g=
 golang.org/x/crypto v0.21.0 h1:X31++rzVUdKhX5sWmSOFZxx8UW/ldWx55cbf08iNAMA=
 golang.org/x/crypto v0.21.0/go.mod h1:0BP7YvVV9gBbVKyeTG0Gyn+gZm94bibOW5BjDEYAOMs=
