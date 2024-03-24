@@ -1,7 +1,8 @@
-// example is an example of how to base multiple products off of the same init/config functionality,
+// rest-example is an example of how to base multiple products off of the same init/config functionality,
 // using rest-app (a framework for a GO (GOLANG) based ReST APIs).
 // This can be used as the basis for a GO based app, needing JWT user authentication,
-// with logging and key/value store (KVS).
+// with logging and key/value store (KVS). This application includes the authentication directly in the
+// service. See github.com/paulfdunn/authJWT for an example of creating a standalone authentication service.
 package main
 
 import (

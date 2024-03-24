@@ -1,5 +1,5 @@
 #!/bin/bash
-# This script will build and run the example app, then issue some curl
+# This script will build and run the rest-example app, then issue some curl
 # commands to the API.
 set -x
 
@@ -10,10 +10,10 @@ function exitOnError {
 }
 
 function cleanup {
-    killall example
-    rm example
-    rm example.db
-    rm example.log.*
+    killall rest-example
+    rm rest-example
+    rm rest-example.db
+    rm rest-example.log.*
 }
 
 ME=`basename $0`
@@ -23,13 +23,13 @@ echo -e "\n\ncleanup prior to start"
 cleanup
 
 echo -e "\n\nbuild and run"
-go build example.go
+go build rest-example.go
 if [[ $? != 0 ]]; then
     echo "FAILED: go build failed"
     exit
 fi
 # Run the app in the background.
-./example  -https-port=8000 -log-level=0 -log-filepath=./example.log &
+./rest-example  -https-port=8000 -log-level=0 -log-filepath=./rest-example.log &
 # Wait for app to start.
 sleep 5
 
@@ -80,8 +80,10 @@ if [[ $HTTP_STATUS != 204 ]]; then
     exitOnError
 fi
 
-cat example.log.0
-cat example.log.audit.0
+echo -e "\n\n"
+cat rest-example.log.0
+echo -e "\n\n"
+cat rest-example.log.audit.0
 
 echo -e "\n\ncleanup and exit"
 cleanup

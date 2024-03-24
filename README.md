@@ -17,6 +17,8 @@ Key features:
 
 ## Usage
 See github.com/paulfdunn/rest-app/example for a full example and working application.
+* run example-test.sh to build/run the example ReST API, authenticate, and issue a command
+that passes a token for authentication.
 * Call ConfigInit to initialize the application configuration.
     * flag.Parse() is called; applicaitons should not call flag.Parse() as flag.Parse() can only be called once per application.
     * Optional - call config.Get() to merge in any saved configuration, which is modified by applications at runtime by calling config.Set().
