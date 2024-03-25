@@ -12,6 +12,8 @@ github.com/paulfdunn/authJWT v1.0.12 h1:/AiPsm6AxHNiUBCJTNZmlD/tnevw6arcWGGBA5bn
 github.com/paulfdunn/authJWT v1.0.12/go.mod h1:ywNltRCfTS/7i5Gnu7ZyYjgh5hKPvJ8uuEEDWGEgNs0=
 github.com/paulfdunn/authJWT v1.0.13 h1:OSMvXTILoUvznAFFja05F4prwRDzzKgTHwIH/r6DlXo=
 github.com/paulfdunn/authJWT v1.0.13/go.mod h1:ywNltRCfTS/7i5Gnu7ZyYjgh5hKPvJ8uuEEDWGEgNs0=
+github.com/paulfdunn/authJWT v1.0.14 h1:acXrLd4dhCETGWh+ZME0dIg+Uq15z0cnWtYPEUAaHcU=
+github.com/paulfdunn/authJWT v1.0.14/go.mod h1:ywNltRCfTS/7i5Gnu7ZyYjgh5hKPvJ8uuEEDWGEgNs0=
 github.com/paulfdunn/go-helper/databaseh v1.0.8 h1:o3BL+JaABLMm8+RqqrDc07tnvv4c6bRlfHsh00lpqIs=
 github.com/paulfdunn/go-helper/databaseh v1.0.8/go.mod h1:atASADDIkX0xEB3PQ3rdOKnSliaRfftRZ+gk3yWtomY=
 github.com/paulfdunn/go-helper/databaseh v1.4.7 h1:HW1ZzP1JnFi28G2Dsy3OyQpL9qZlFr7Rxx2Dofn30DA=

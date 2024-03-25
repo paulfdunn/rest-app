@@ -3,5 +3,5 @@ go 1.21.8
 use (
 	.
 	./core
-	./example
+	./example-standalone
 )

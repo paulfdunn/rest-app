@@ -16,7 +16,10 @@ import (
 )
 
 type Config struct {
-	// CLI parameters
+	// Values provided by CLI parameters
+	// DataSourcePath is the path to the config data source. Set to:
+	// filepath.Join(*persistentDirectory, *cnfg.AppName+".config.db")
+	DataSourcePath *string `json:",omitempty"`
 	// HTTPSPort - see CLI help for description.
 	HTTPSPort *int `json:",omitempty"`
 	// LogFilepath - see CLI help for description.
@@ -26,7 +29,7 @@ type Config struct {
 	// PersistentDirectory - see CLI help for description.
 	PersistentDirectory *string `json:",omitempty"`
 
-	// Other
+	// Other - can be passed into Init.
 	// AppName is used to populate the Issuer field of the JWT Claims and will be used
 	// as the file name, prefix '.db', for the persistent data source.
 	AppName *string `json:",omitempty"`
@@ -36,9 +39,6 @@ type Config struct {
 	// at DataSourcePath. This can be used by the calling application to perform other initialization
 	// of the data source.
 	DataSourceIsNew *bool `json:",omitempty"`
-	// DataSourcePath is the path to the config data source;
-	// DataSourcePath = filepath.Join(*persistentDirectory, *cnfg.AppName+".db")
-	DataSourcePath *string `json:",omitempty"`
 	// LogName is the name of the logh log to use.
 	LogName *string `json:",omitempty"`
 	// Version is for application version information.
@@ -46,7 +46,8 @@ type Config struct {
 }
 
 const (
-	configKey = "config"
+	configFileSuffix = ".config.db"
+	configKey        = "config"
 )
 
 var (
@@ -98,7 +99,7 @@ func Init(initConfig Config, checkLogSize int, maxLogSize int64,
 	if logFilepath != nil {
 		auditLogFilepath = *logFilepath + ".audit"
 	}
-	if initConfig.AuditLogName == nil {
+	if initConfig.AuditLogName == nil || *initConfig.AuditLogName == "" {
 		aln := *initConfig.LogName + ".audit"
 		initConfig.AuditLogName = &aln
 	}
@@ -128,7 +129,7 @@ func Init(initConfig Config, checkLogSize int, maxLogSize int64,
 		}
 	}
 
-	dataSourcePath := filepath.Join(*persistentDirectory, *initConfig.AppName+".db")
+	dataSourcePath := filepath.Join(*persistentDirectory, *initConfig.AppName+configFileSuffix)
 
 	// reset if requested - do PRIOR to logging setup as logs are deleted.
 	if err = resetIfRequested(*reset, dataSourcePath, filepathsToDeleteOnReset); err != nil {
@@ -154,11 +155,11 @@ func Init(initConfig Config, checkLogSize int, maxLogSize int64,
 	DefaultConfig.LogFilepath = logFilepath
 	DefaultConfig.LogLevel = logLevel
 	DefaultConfig.PersistentDirectory = persistentDirectory
+	DefaultConfig.DataSourcePath = &dataSourcePath
 	// Other
 	DefaultConfig.AppName = initConfig.AppName
 	DefaultConfig.AuditLogName = initConfig.AuditLogName
 	DefaultConfig.DataSourceIsNew = &dataSourceIsNew
-	DefaultConfig.DataSourcePath = &dataSourcePath
 	DefaultConfig.LogName = initConfig.LogName
 	DefaultConfig.Version = initConfig.Version
 }

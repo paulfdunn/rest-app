@@ -1,8 +1,8 @@
-// rest-example is an example of how to base multiple products off of the same init/config functionality,
-// using rest-app (a framework for a GO (GOLANG) based ReST APIs).
-// This can be used as the basis for a GO based app, needing JWT user authentication,
-// with logging and key/value store (KVS). This application includes the authentication directly in the
-// service. See github.com/paulfdunn/authJWT for an example of creating a standalone authentication service.
+// example-auth-as-service is an example of using github.com/paulfdunn/rest-app (a framework for a
+// GO (GOLANG) based ReST APIs) to create a service that does not include authentication, but
+// relies on a separate auth service to provide clients with authentication service. This service
+// is then called with a token provisioned from the separate authentication service, and this
+// service validates the token for paths requiring authentication.
 package main
 
 import (
@@ -25,11 +25,11 @@ const (
 	// relative file paths will be joined with appPath to create the path to the file.
 	relativeCertFilePath   = "/key/rest-app.crt"
 	relativeKeyFilePath    = "/key/rest-app.key"
-	relativePrivateKeyPath = "/key/jwt.rsa.private"
+	relativePrivateKeyPath = "../example-standalone/key/jwt.rsa.private"
 )
 
 var (
-	appName = "example"
+	appName = "example-auth-as-service"
 
 	// API timeouts
 	apiReadTimeout  = 10 * time.Second
@@ -42,10 +42,6 @@ var (
 	// logh function pointers make logging calls more compact, but are optional.
 	lp  func(level logh.LoghLevel, v ...interface{})
 	lpf func(level logh.LoghLevel, format string, v ...interface{})
-
-	// initial credentials
-	initialEmail    = "admin"
-	initialPassword = "P@ss!234"
 )
 
 func main() {
@@ -85,24 +81,13 @@ func main() {
 	lpf(logh.Info, "Config: %s", runtimConfig)
 
 	privateKeyPath := filepath.Join(appPath, relativePrivateKeyPath)
-	jwtRemovalInterval := time.Minute
-	jwtExpirationInterval := time.Minute * 15
 	ac := authJWT.Config{
-		AppName:                   *runtimConfig.AppName,
-		AuditLogName:              *runtimConfig.AuditLogName,
-		DataSourcePath:            *runtimConfig.DataSourcePath,
-		CreateRequiresAuth:        true,
-		JWTAuthRemoveInterval:     jwtRemovalInterval,
-		JWTAuthExpirationInterval: jwtExpirationInterval,
-		JWTKeyPath:                privateKeyPath,
-		LogName:                   *runtimConfig.LogName,
+		AppName:    *runtimConfig.AppName,
+		JWTKeyPath: privateKeyPath,
+		LogName:    *runtimConfig.LogName,
 	}
 	mux := http.NewServeMux()
-	var initialCreds *authJWT.Credential
-	if *runtimConfig.DataSourceIsNew {
-		initialCreds = &authJWT.Credential{Email: &initialEmail, Password: &initialPassword}
-	}
-	core.OtherInit(&ac, mux, initialCreds)
+	core.OtherInit(&ac, nil, nil)
 
 	// Registering with the trailing slash means the naked path is redirected to this path.
 	path := "/"

@@ -1,9 +1,9 @@
 # rest-app
 This is the framework for a GO (GOLANG) based ReST API. This can be used as the basis for a GO based app, needing JWT user authentication, with logging and key/value store (KVS). 
 
-There are 2 parts to this application"
+There are multiple  parts to this repo:
 * github.com/paulfdunn/rest-app/core - Application initialization and configuration. This is provided in a core package to allow leveraging many apps from the same configuration/initialization code. 
-* github.com/paulfdunn/rest-app/example is provided to show an example of one app, using the core configuration/initialization provided.
+* github.com/paulfdunn/rest-app/example-standalone is provided to show an example of one service, using the core configuration/initialization provided, with authentication running as part of the service.
 
 Key features:
 * Leveled logging; provided by github.com/paulfdunn/go-helper/logh 
@@ -14,9 +14,10 @@ Key features:
     * Authentication supports 2 models: anyone can create a login, or only a registered user can create a new login. The later is the default in the example app.
     * Authentication supports REGEX based validation/rules for passwords.
     * All authentication data is kept in a datastore separate from application configuration. 
+    * Authentication can be embedded in a service, or a standalone service.
 
-## Usage
-See github.com/paulfdunn/rest-app/example for a full example and working application.
+## Usage - standalone service with authentication
+See github.com/paulfdunn/rest-app/example-standalone for a full example and working application.
 * run example-test.sh to build/run the example ReST API, authenticate, and issue a command
 that passes a token for authentication.
 * Call ConfigInit to initialize the application configuration.
@@ -24,3 +25,7 @@ that passes a token for authentication.
     * Optional - call config.Get() to merge in any saved configuration, which is modified by applications at runtime by calling config.Set().
 * Call OtherInit to initialize any other provided functionality.
 * Call blocking function ListenAndServeTLS to start serving your API.
+
+## Usage - authentication as a standalone service, used by one or more independent services 
+See github.com/paulfdunn/rest-app/example-auth-as-a-service for a full example and working application.
+* In this authentication model, tokens are issues by the authentication service using a relatively short expiration interval, and client services can only validate that a token was valid when issued. Client services cannot verify the user hasn't used the authentication service to log out or invalidate all tokens. Thus keeping a short JWTAuthExpirationInterval, and frequent refresh, is important.
