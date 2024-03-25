@@ -17,15 +17,18 @@ Key features:
     * Authentication can be embedded in a service, or a standalone service.
 
 ## Usage - standalone service with authentication
-See github.com/paulfdunn/rest-app/example-standalone for a full example and working application.
-* run example-test.sh to build/run the example ReST API, authenticate, and issue a command
+See github.com/paulfdunn/rest-app/example-standalone for a full example and working application that provides a ReST API with JWT authentication.
+* Run test-example-standalone.sh to build/run the example ReST API, authenticate, and issue a command
 that passes a token for authentication.
-* Call ConfigInit to initialize the application configuration.
+example-standalone.go
+* Calls ConfigInit to initialize the application configuration.
     * flag.Parse() is called; applicaitons should not call flag.Parse() as flag.Parse() can only be called once per application.
     * Optional - call config.Get() to merge in any saved configuration, which is modified by applications at runtime by calling config.Set().
-* Call OtherInit to initialize any other provided functionality.
-* Call blocking function ListenAndServeTLS to start serving your API.
+* Calls OtherInit to initialize any other provided functionality.
+* Calls blocking function ListenAndServeTLS to start serving your API.
 
 ## Usage - authentication as a standalone service, used by one or more independent services 
-See github.com/paulfdunn/rest-app/example-auth-as-a-service for a full example and working application.
-* In this authentication model, tokens are issues by the authentication service using a relatively short expiration interval, and client services can only validate that a token was valid when issued. Client services cannot verify the user hasn't used the authentication service to log out or invalidate all tokens. Thus keeping a short JWTAuthExpirationInterval, and frequent refresh, is important.
+See github.com/paulfdunn/rest-app/example-auth-as-a-service for a full example and working application that provides authentication as a service (for use by one or more application services) and an example application service.
+* Run test-example-auth-as-service.sh to build/run the example ReST API, authenticate via the authentication service, then issue a command to the application which validates the provided token.
+* github.com/paulfdunn/rest-app/example-standalone is used to provide authentication, and github.com/paulfdunn/rest-app/example-auth-as-a-service is the application service.
+* In this authentication model, tokens are issues by the authentication service using a relatively short expiration interval, and application services can only validate that a token was valid when issued. Application services cannot verify the user hasn't used the authentication service to log out or invalidate all tokens. Thus keeping a short JWTAuthExpirationInterval, and frequent refresh, is important.
