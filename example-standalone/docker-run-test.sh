@@ -1,6 +1,7 @@
 #!/bin/bash
-# docker-run-test.sh will run the example-standalone app in a docker container, get a token
-# then GET the root path, resulting in:
+# docker-run-test.sh will run the example-standalone app in a docker container, GET
+# the root path without the token to show authentication is required, then get a token
+# and GET the root path, resulting in:
 # `hostname: example-standalone, rest-app - from github.com/paulfdunn/rest-app`
 set -x
 
