@@ -22,7 +22,6 @@ echo "STARTING: $ME"
 echo -e "\n\ncleanup prior to start"
 cleanup
 
-
 echo -e "\n\nbuild and run the container"
 docker build -t rest-app/example-standalone:v0.0.0 .
 docker run -p 127.0.0.1:8000:8000/tcp -d --hostname example-standalone --name example-standalone rest-app/example:v0.0.0
