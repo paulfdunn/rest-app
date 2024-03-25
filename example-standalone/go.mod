@@ -3,7 +3,7 @@ module github.com/paulfdunn/rest-app/example-standalone
 go 1.21.8
 
 require (
-	github.com/paulfdunn/authJWT v1.0.14
+	github.com/paulfdunn/authJWT v1.0.15
 	github.com/paulfdunn/go-helper/logh v1.3.7
 	github.com/paulfdunn/go-helper/osh v1.3.7
 	github.com/paulfdunn/rest-app/core v1.0.7
