@@ -96,7 +96,7 @@ func Init(initConfig Config, checkLogSize int, maxLogSize int64,
 		log.Fatalf("fatal: %s error creating log, error: %v", runtimeh.SourceInfo(), err)
 	}
 	var auditLogFilepath string
-	if logFilepath != nil {
+	if logFilepath != nil && *logFilepath != "" {
 		auditLogFilepath = *logFilepath + ".audit"
 	}
 	if initConfig.AuditLogName == nil || *initConfig.AuditLogName == "" {

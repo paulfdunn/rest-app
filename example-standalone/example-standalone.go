@@ -26,6 +26,7 @@ const (
 	relativeCertFilePath   = "/key/rest-app.crt"
 	relativeKeyFilePath    = "/key/rest-app.key"
 	relativePrivateKeyPath = "/key/jwt.rsa.private"
+	relativePublicKeyPath  = "../example-standalone/key/jwt.rsa.public"
 )
 
 var (
@@ -78,30 +79,32 @@ func main() {
 	// Create the default config, then read overwrite any config that might have been saved at
 	// runtime (from a previous run, using config.Set()) with a call to config.Get()
 	core.ConfigInit(inputConfig, filepathsToDeleteOnReset)
-	var runtimConfig config.Config
-	if runtimConfig, err = config.Get(); err != nil {
+	var runtimeConfig config.Config
+	if runtimeConfig, err = config.Get(); err != nil {
 		log.Fatalf("fatal: %s getting running config, error:%v", runtimeh.SourceInfo(), err)
 	}
-	lpf(logh.Info, "Config: %s", runtimConfig)
+	lpf(logh.Info, "Config: %s", runtimeConfig)
 
 	privateKeyPath := filepath.Join(appPath, relativePrivateKeyPath)
+	publicKeyPath := filepath.Join(appPath, relativePublicKeyPath)
 	jwtRemovalInterval := time.Minute
 	jwtExpirationInterval := time.Minute * 15
 	// Technically the authJWT.Config could be embedded in the core.Config, but that opens
 	// security holes allowing someone to redirect authentication to a different source.
 	ac := authJWT.Config{
-		AppName:                   *runtimConfig.AppName,
-		AuditLogName:              *runtimConfig.AuditLogName,
-		DataSourcePath:            filepath.Join(filepath.Dir(*runtimConfig.DataSourcePath), *runtimConfig.AppName+authFileSuffix),
+		AppName:                   *runtimeConfig.AppName,
+		AuditLogName:              *runtimeConfig.AuditLogName,
+		DataSourcePath:            filepath.Join(filepath.Dir(*runtimeConfig.DataSourcePath), *runtimeConfig.AppName+authFileSuffix),
 		CreateRequiresAuth:        true,
 		JWTAuthRemoveInterval:     jwtRemovalInterval,
 		JWTAuthExpirationInterval: jwtExpirationInterval,
-		JWTKeyPath:                privateKeyPath,
-		LogName:                   *runtimConfig.LogName,
+		JWTPrivateKeyPath:         privateKeyPath,
+		JWTPublicKeyPath:          publicKeyPath,
+		LogName:                   *runtimeConfig.LogName,
 	}
 	mux := http.NewServeMux()
 	var initialCreds *authJWT.Credential
-	if *runtimConfig.DataSourceIsNew {
+	if *runtimeConfig.DataSourceIsNew {
 		initialCreds = &authJWT.Credential{Email: &initialEmail, Password: &initialPassword}
 	}
 	core.OtherInit(&ac, mux, initialCreds)
@@ -114,7 +117,7 @@ func main() {
 	cfp := filepath.Join(appPath, relativeCertFilePath)
 	kfp := filepath.Join(appPath, relativeKeyFilePath)
 	// blocking call
-	core.ListenAndServeTLS(appName, mux, fmt.Sprintf(":%d", *runtimConfig.HTTPSPort),
+	core.ListenAndServeTLS(appName, mux, fmt.Sprintf(":%d", *runtimeConfig.HTTPSPort),
 		apiReadTimeout, apiWriteTimeout, cfp, kfp)
 }
 

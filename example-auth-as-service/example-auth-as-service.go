@@ -23,9 +23,9 @@ import (
 
 const (
 	// relative file paths will be joined with appPath to create the path to the file.
-	relativeCertFilePath   = "/key/rest-app.crt"
-	relativeKeyFilePath    = "/key/rest-app.key"
-	relativePrivateKeyPath = "../example-standalone/key/jwt.rsa.private"
+	relativeCertFilePath  = "/key/rest-app.crt"
+	relativeKeyFilePath   = "/key/rest-app.key"
+	relativePublicKeyPath = "../example-standalone/key/jwt.rsa.public"
 )
 
 var (
@@ -74,17 +74,17 @@ func main() {
 	// Create the default config, then read overwrite any config that might have been saved at
 	// runtime (from a previous run, using config.Set()) with a call to config.Get()
 	core.ConfigInit(inputConfig, filepathsToDeleteOnReset)
-	var runtimConfig config.Config
-	if runtimConfig, err = config.Get(); err != nil {
+	var runtimeConfig config.Config
+	if runtimeConfig, err = config.Get(); err != nil {
 		log.Fatalf("fatal: %s getting running config, error:%v", runtimeh.SourceInfo(), err)
 	}
-	lpf(logh.Info, "Config: %s", runtimConfig)
+	lpf(logh.Info, "Config: %s", runtimeConfig)
 
-	privateKeyPath := filepath.Join(appPath, relativePrivateKeyPath)
+	publicKeyPath := filepath.Join(appPath, relativePublicKeyPath)
 	ac := authJWT.Config{
-		AppName:    *runtimConfig.AppName,
-		JWTKeyPath: privateKeyPath,
-		LogName:    *runtimConfig.LogName,
+		AppName:          *runtimeConfig.AppName,
+		JWTPublicKeyPath: publicKeyPath,
+		LogName:          *runtimeConfig.LogName,
 	}
 	mux := http.NewServeMux()
 	core.OtherInit(&ac, nil, nil)
@@ -97,7 +97,7 @@ func main() {
 	cfp := filepath.Join(appPath, relativeCertFilePath)
 	kfp := filepath.Join(appPath, relativeKeyFilePath)
 	// blocking call
-	core.ListenAndServeTLS(appName, mux, fmt.Sprintf(":%d", *runtimConfig.HTTPSPort),
+	core.ListenAndServeTLS(appName, mux, fmt.Sprintf(":%d", *runtimeConfig.HTTPSPort),
 		apiReadTimeout, apiWriteTimeout, cfp, kfp)
 }
 

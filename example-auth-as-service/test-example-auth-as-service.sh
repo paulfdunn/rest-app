@@ -5,7 +5,7 @@ set -x
 
 function exitOnError {
     echo "FAILED: $ME"
-    cleanup
+    # cleanup
     exit $HTTP_STATUS
 }
 
