@@ -1,8 +1,13 @@
 **/.DS_Store
 *.code-workspace
+**/taskdata
 core
 !core/
-example
-!example/
+example-auth-as-service
+!example-auth-as-service/
+example-standalone
+!example-standalone/
+example-telemetry
+!example-telemetry/
 *.log.*
 *.db

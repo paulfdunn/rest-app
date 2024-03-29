@@ -60,10 +60,6 @@ func main() {
 	// flag.Parse() is called by config.Config; apps should not call flag.Parse()
 	inputConfig := config.Config{AppName: &appName, LogName: &appName}
 
-	// logh function pointers make logging calls more compact, but are optional.
-	lp = logh.Map[appName].Println
-	lpf = logh.Map[appName].Printf
-
 	// default to the executable path.
 	exe, err := os.Executable()
 	if err != nil {
@@ -74,6 +70,10 @@ func main() {
 	// Create the default config, then read overwrite any config that might have been saved at
 	// runtime (from a previous run, using config.Set()) with a call to config.Get()
 	core.ConfigInit(inputConfig, filepathsToDeleteOnReset)
+	// logh function pointers make logging calls more compact, but are optional. Must be done after config
+	// has initialized logging
+	lp = logh.Map[appName].Println
+	lpf = logh.Map[appName].Printf
 	var runtimeConfig config.Config
 	if runtimeConfig, err = config.Get(); err != nil {
 		log.Fatalf("fatal: %s getting running config, error:%v", runtimeh.SourceInfo(), err)

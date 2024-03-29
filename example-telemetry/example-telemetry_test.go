@@ -5,20 +5,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/paulfdunn/go-helper/logh"
+	"github.com/paulfdunn/go-helper/osh/runtimeh"
 )
 
-type expectedFailedRequest struct {
-	httpMethod          string
-	task                Task
-	expectedHTTPResonse int
-	handlerFunc         http.HandlerFunc
+type expectedResponse struct {
+	httpMethod  string
+	task        Task
+	httpResonse int
+	handlerFunc http.HandlerFunc
 }
 
 func init() {
@@ -90,109 +93,171 @@ func TestTaskEqual(t *testing.T) {
 	}
 }
 
-func TestTaskGet(t *testing.T) {
-	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
-	defer testServer.Close()
-
-	resp, _ := http.Get(testServer.URL)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("invalid method did not return proper status: %d", resp.StatusCode)
-		return
-	}
-}
-
-// TestExpectedFailureRequests are negative tests to validate API requirements for parameters.
-func TestExpectedFailureRequests(t *testing.T) {
+// TestExpectedResponse are tests to validate API requirements for parameters. A task is sent, and
+// the resp.StatusCode is validated against what is expected.
+func TestExpectedResponse(t *testing.T) {
 	cancelTrue := true
 	cancelFalse := false
 	command := []string{"cmd"}
 	exp := time.Now().Add(time.Minute).Format(dateFormat)
 	status := Accepted
 	shell := []string{"shell"}
-	taskInvalidUUID := uuid.New()
-	taskValidUUID := uuid.New()
-	task := Task{UUID: &taskValidUUID}
-	telemetryKVS.Serialize(task.UUID.String(), task)
+	invalidUUID := uuid.New()
+	validUUID := uuid.New()
+	task := Task{UUID: &validUUID}
+	err := telemetryKVS.Serialize(task.Key(), task)
+	if err != nil {
+		t.Errorf("Serialize error: %+v", err)
+	}
 
-	expectedFailedRequests := []expectedFailedRequest{}
+	expectedResponses := []expectedResponse{}
 
 	// http.MethoDelete tests
+	// Delete can only provide the UUID
 	task = Task{}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{UUID: &taskInvalidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Command: command, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	task = Task{UUID: &invalidUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	task = Task{Cancel: &cancelTrue, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	task = Task{Command: command, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
 	// Make sure the time is in the future.
-	task = Task{Expiration: &exp, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Status: &status, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Shell: shell, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	task = Task{Expiration: &exp, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	task = Task{Status: &status, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	task = Task{Shell: shell, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
+	// Task status must be one of Canceled, Completed, or Expired
+	for i := Accepted; i <= Running; i++ {
+		vu := uuid.New()
+		st := i
+		// Serialize a task with status, but Status must be empty for the request.
+		stask := Task{Status: &st, UUID: &vu}
+		telemetryKVS.Serialize(stask.Key(), stask)
+		if err != nil {
+			t.Errorf("Serialize error: %+v", err)
+		}
+		task := Task{UUID: &vu}
+		var status int
+		switch i {
+		case Canceled, Completed, Expired:
+			status = http.StatusNoContent
+		default:
+			status = http.StatusBadRequest
+		}
+		expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, status, handlerTask})
+	}
+
+	// http.MethodGet tests
+	// Get with invalid UUID
+	task = Task{UUID: &invalidUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodGet, task, http.StatusBadRequest, handlerTask})
 
 	// http.MethodPost tests
 	// Post with a UUID is not valid
-	task = Task{UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPost, task, http.StatusBadRequest, handlerTask})
+	task = Task{UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
 	// POST with a Status (loop 0) or Cancel (loop1) are not valid
 	task = Task{Status: &status}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPost, task, http.StatusBadRequest, handlerTask})
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
 	task = Task{Cancel: &cancelTrue}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPost, task, http.StatusBadRequest, handlerTask})
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
 	// POST with a expiration in the past is not valid.
 	task = Task{Expiration: &exp}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPost, task, http.StatusBadRequest, handlerTask})
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
 
 	// http.MethodPut tests
 	// PUT without both Cancel and UUID, with an invalid UUID, or with a Command, Expiration,
 	// Shell, or Status are not valid.
 	task = Task{Cancel: &cancelTrue}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, Command: command, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	task = Task{UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	task = Task{Cancel: &cancelTrue, Command: command, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
 	// Make sure the time is in the future.
 	exp = time.Now().Add(time.Minute).Format(dateFormat)
-	task = Task{Cancel: &cancelTrue, Expiration: &exp, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	task = Task{Cancel: &cancelTrue, Expiration: &exp, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
 	status = Accepted
-	task = Task{Cancel: &cancelTrue, Status: &status, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, Shell: shell, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, UUID: &taskInvalidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelFalse, UUID: &taskValidUUID}
-	expectedFailedRequests = append(expectedFailedRequests, expectedFailedRequest{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	task = Task{Cancel: &cancelTrue, Status: &status, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	task = Task{Cancel: &cancelTrue, Shell: shell, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	task = Task{Cancel: &cancelTrue, UUID: &invalidUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	task = Task{Cancel: &cancelFalse, UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
 
-	for i := 0; i < len(expectedFailedRequests); i++ {
-		testServer := httptest.NewServer(http.HandlerFunc(expectedFailedRequests[i].handlerFunc))
+	for i := 0; i < len(expectedResponses); i++ {
+		testServer := httptest.NewServer(http.HandlerFunc(expectedResponses[i].handlerFunc))
 		defer testServer.Close()
 
-		taskBytes, err := json.Marshal(expectedFailedRequests[i].task)
+		taskBytes, err := json.Marshal(expectedResponses[i].task)
 		if err != nil {
 			t.Errorf("Marshal error: %v", err)
 			return
 		}
 		client := &http.Client{}
-		req, err := http.NewRequest(expectedFailedRequests[i].httpMethod, testServer.URL, bytes.NewBuffer(taskBytes))
+		req, err := http.NewRequest(expectedResponses[i].httpMethod, testServer.URL, bytes.NewBuffer(taskBytes))
 		if err != nil {
 			t.Errorf("NewRequest error: %v", err)
 			return
 		}
 		resp, err := client.Do(req)
-		if err != nil || resp.StatusCode != expectedFailedRequests[i].expectedHTTPResonse {
-			t.Errorf("%s %d with status did not return proper status: %d", expectedFailedRequests[i].httpMethod, i, resp.StatusCode)
+		if err != nil || resp.StatusCode != expectedResponses[i].httpResonse {
+			t.Errorf("%s %d with status did not return proper status: %d", expectedResponses[i].httpMethod, i, resp.StatusCode)
 			return
 		}
 	}
 }
 
-// TestTaskDelete does a POST to create a task, then deletes that task.
+// TestStatus POSTs several tasks, and validates it can get one or all.
+func TestStatus(t *testing.T) {
+	testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
+	defer testServerStatus.Close()
+
+	clearTelemetryKVS(t)
+
+	// Make some tasks for testing and POST them
+	tasks := make([]*Task, 4)
+	for i := range tasks {
+		task := Task{}
+		rtask, err := testTaskPost(t, task)
+		if err != nil {
+			t.Errorf("could not POST task: %+v", err)
+			return
+		}
+		tasks[i] = rtask
+	}
+
+	rtasks := []Task{}
+	getAndUnmarshal(t, testServerStatus.URL, &rtasks)
+
+	if len(rtasks) != len(tasks) {
+		t.Errorf("status returned incorrect data")
+	}
+
+	// Use query strings to successively ask for tasks
+	for i := range tasks {
+		queries := make([]string, i+1)
+		for j := 0; j <= i; j++ {
+			queries[j] = fmt.Sprintf("%s=%s", queryParamUUID, tasks[j].Key())
+		}
+		query := "/?" + strings.Join(queries, "&")
+
+		rtasks = []Task{}
+		getAndUnmarshal(t, testServerStatus.URL+query, &rtasks)
+
+		if len(rtasks) != i+1 {
+			t.Errorf("status returned incorrect data")
+		}
+	}
+}
+
+// TestTaskDelete does a POST to create a task, updates the status to Completed, then deletes that task.
 func TestTaskDelete(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
 	defer testServer.Close()
@@ -207,6 +272,18 @@ func TestTaskDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("marshal error: %v", err)
 		return
+	}
+
+	err = telemetryKVS.Deserialize(rtask.Key(), &rtask)
+	if err != nil {
+		t.Errorf("Could not deserialize task: %+v", err)
+		return
+	}
+	st := Completed
+	rtask.Status = &st
+	err = telemetryKVS.Serialize(rtask.Key(), rtask)
+	if err != nil {
+		t.Errorf("Serialize error: %+v", err)
 	}
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodDelete, testServer.URL, bytes.NewBuffer(rtaskBytes))
@@ -255,7 +332,7 @@ func TestTaskPost(t *testing.T) {
 		}
 		task.Expiration = &exp
 		dtask := Task{}
-		err = telemetryKVS.Deserialize(rtask.UUID.String(), &dtask)
+		err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
 		if err != nil {
 			t.Errorf("Could not deserialize task: %+v", err)
 			return
@@ -267,36 +344,42 @@ func TestTaskPost(t *testing.T) {
 	}
 }
 
-// TestTaskPut validates canceling a task.
+// TestTaskPut POSTs a new task, validates it status gets changed to Completed, and validates canceling that task
 func TestTaskPut(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
 	defer testServer.Close()
 
-	// Store a task, then cancel it and validate the KVS is updated.
-	nu := uuid.New()
-	task := Task{UUID: &nu}
-	telemetryKVS.Serialize(task.UUID.String(), task)
+	task := Task{}
+	rtask, err := testTaskPost(t, task)
+	if err != nil {
+		t.Errorf("could not POST task: %+v", err)
+		return
+	}
 	tr := true
-	task.Cancel = &tr
-	taskBytes, err := json.Marshal(task)
+	rtask.Cancel = &tr
+	rtaskBytes, err := json.Marshal(*rtask)
 	if err != nil {
 		t.Errorf("Marshal error: %v", err)
 		return
 	}
-	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodPut, testServer.URL, bytes.NewBuffer(taskBytes))
-	if err != nil {
-		t.Errorf("NewRequest error: %v", err)
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != http.StatusAccepted {
-		t.Errorf("PUT did not return proper status: %d", resp.StatusCode)
-		return
-	}
-	// validate
+
+	// Sleep long enough to make sure the task has been processed by taskRunner
+	time.Sleep(taskRunnerCycleTime * 2)
 	dtask := Task{}
-	err = telemetryKVS.Deserialize(task.UUID.String(), &dtask)
+
+	// Validate the status is Running
+	err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
+	if err != nil {
+		t.Errorf("Could not deserialize task: %+v", err)
+		return
+	}
+	if dtask.Status == nil || *dtask.Status != Completed {
+		t.Errorf("task status is not Completed, is %s", *dtask.Status)
+		return
+	}
+
+	// Cancel the task
+	err = requestAndDeserialize(t, http.MethodPut, testServer.URL, rtaskBytes, rtask.Key(), &dtask)
 	if err != nil {
 		t.Errorf("could not deserialize task: %+v", err)
 		return
@@ -306,11 +389,68 @@ func TestTaskPut(t *testing.T) {
 	exp := time.Now().Add(-1 * time.Minute).Format(dateFormat)
 	// The Equal function requires an expiration...
 	dtask.Expiration = &exp
-	task.Expiration = &exp
-	if !dtask.Equal(&task, 0) {
+	rtask.Expiration = &exp
+	if !dtask.Equal(rtask, 0) {
 		t.Errorf("canceled and deserialized tasks are not equal, task: %+v, dtask: %+v", task, dtask)
 		return
 	}
+}
+
+func clearTelemetryKVS(t *testing.T) error {
+	keys, err := telemetryKVS.Keys()
+	if err != nil {
+		t.Errorf("could not get keys: %+v", err)
+		return err
+	}
+	for _, key := range keys {
+		_, err := telemetryKVS.Delete(key)
+		if err != nil {
+			t.Errorf("could not delete key: %+v", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func getAndUnmarshal(t *testing.T, URL string, obj interface{}) error {
+	resp, err := http.Get(URL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Errorf("did not return proper status: %d", resp.StatusCode)
+		return err
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("ReadAll error: %v", err)
+		return err
+	}
+	resp.Body.Close()
+	err = json.Unmarshal(bodyBytes, obj)
+	if err != nil {
+		t.Errorf("could not unmarshal tasks: %+v", err)
+		return err
+	}
+	return nil
+}
+
+// requestAndDeserialize will make a request using httpMethod, sending inputBytes, then deserialize key into obj.
+func requestAndDeserialize(t *testing.T, httpMethod string, URL string, inputBytes []byte, key string, obj interface{}) error {
+	client := &http.Client{}
+	req, err := http.NewRequest(httpMethod, URL, bytes.NewBuffer(inputBytes))
+	if err != nil {
+		t.Errorf("NewRequest error: %v", err)
+		return err
+	}
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusAccepted {
+		t.Errorf("request did not return proper status: %d", resp.StatusCode)
+		return err
+	}
+	err = telemetryKVS.Deserialize(key, obj)
+	if err != nil {
+		t.Errorf("could not deserialize obj: %+v", err)
+		return err
+	}
+	return nil
 }
 
 // testTaskPost is a helper function to POST a Task and return the returned Task.
@@ -323,10 +463,10 @@ func testTaskPost(t *testing.T, task Task) (*Task, error) {
 		t.Errorf("marshal error: %v", err)
 		return nil, err
 	}
-	resp, _ := http.Post(testServer.URL, "application/json", bytes.NewBuffer(taskBytes))
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("invalid method did not return proper status: %d", resp.StatusCode)
-		return nil, err
+	resp, err := http.Post(testServer.URL, "application/json", bytes.NewBuffer(taskBytes))
+	if err != nil || resp.StatusCode != http.StatusCreated {
+		t.Errorf("POST method did not return proper status: %d", resp.StatusCode)
+		return nil, fmt.Errorf("%+v", err)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -350,13 +490,21 @@ func testSetup(t *testing.T) {
 	// 	main()
 	// }()
 
-	// lp = logh.Map[config.LogName].Println
+	// log to STDOUT
+	err := logh.New("", "", logh.DefaultLevels, logh.Info, logh.DefaultFlags, 0, 0)
+	if err != nil {
+		log.Fatalf("fatal: %s error creating audit log, error: %v", runtimeh.SourceInfo(), err)
+	}
+	lp = logh.Map[""].Println
 	lpf = logh.Map[""].Printf
+	lp(logh.Info, "testSetup")
 
 	tempDir := t.TempDir()
-	fmt.Printf("tempDir: %s\n", tempDir)
+	lpf(logh.Info, "tempDir: %s\n", tempDir)
 	runtimeConfig.PersistentDirectory = &tempDir
 
 	// Every call to TempDir returns a unique directory; there is no need to remove files.
 	initializeKVS(tempDir, appName+telemetryFileSuffix)
+	maxTasks = 500
+	initializeTaskInfrastructure()
 }

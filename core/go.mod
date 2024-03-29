@@ -15,5 +15,3 @@ require (
 	github.com/paulfdunn/go-helper/neth v1.4.8 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 )
-
-// replace github.com/paulfdunn/authJWT => /Users/pauldunn/go/src/github.com/paulfdunn/authJWT

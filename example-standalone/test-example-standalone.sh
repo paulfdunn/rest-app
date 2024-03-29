@@ -24,13 +24,12 @@ echo -e "\n\ncleanup prior to start"
 cleanup
 
 echo -e "\n\nbuild and run"
-go build example-standalone.go
-if [[ $? != 0 ]]; then
+go build
     echo "FAILED: go build failed"
     exit
 fi
 # Run the app in the background.
-./example-standalone  -https-port=8000 -log-level=0 -log-filepath=./example-standalone.log &
+./example-standalone  -https-port=8000 -log-level=0 -log-filepath=./example-standalone.log  -persistent-directory=./ &
 # Wait for app to start.
 sleep 5
 
@@ -85,6 +84,11 @@ echo -e "\n\n"
 cat example-standalone.log.0
 echo -e "\n\n"
 cat example-standalone.log.audit.0
+
+echo "Press any key to continue..."
+# -s: Do not echo input coming
+# -n 1: Read one character
+read -s -n 1
 
 echo -e "\n\ncleanup and exit"
 ls -al
