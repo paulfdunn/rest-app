@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -161,6 +162,7 @@ func taskGet(w http.ResponseWriter, r *http.Request) {
 	task := Task{}
 	if err := httph.BodyUnmarshal(w, r, &task); err != nil {
 		lpf(logh.Error, "taskGet error:%v", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if task.Cancel != nil || task.Command != nil || task.Expiration != nil || task.Shell != nil || task.Status != nil ||
@@ -180,13 +182,9 @@ func taskGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO - return tar file....
-	// not really doing anything here yet.....
-	// w.WriteHeader(http.StatusNotImplemented)
-
-	// w.Header().Set("Content-Type", "application/x-gzip")
-	// w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(returnedFilePath))
-	// http.ServeFile(w, r, returnedFilePath)
+	w.Header().Set("Content-Type", "application/x-gzip")
+	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(task.ZipFilePath()))
+	http.ServeFile(w, r, task.ZipFilePath())
 }
 
 func taskPost(w http.ResponseWriter, r *http.Request) {

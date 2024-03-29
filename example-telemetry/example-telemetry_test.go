@@ -8,11 +8,15 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/paulfdunn/go-helper/archiveh/ziph"
 	"github.com/paulfdunn/go-helper/logh"
 	"github.com/paulfdunn/go-helper/osh/runtimeh"
 )
@@ -349,12 +353,28 @@ func TestTaskPut(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
 	defer testServer.Close()
 
-	task := Task{}
+	task := Task{Shell: []string{"ls -alt"}}
 	rtask, err := testTaskPost(t, task)
 	if err != nil {
 		t.Errorf("could not POST task: %+v", err)
 		return
 	}
+	// Sleep long enough to make sure the task has been processed by taskRunner
+	time.Sleep(taskRunnerCycleTime * 2)
+	dtask := Task{}
+
+	// Validate the status is Completed
+	err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
+	if err != nil {
+		t.Errorf("Could not deserialize task: %+v", err)
+		return
+	}
+	if dtask.Status == nil || *dtask.Status != Completed {
+		t.Errorf("task status is not Completed, task: %+v", dtask)
+		return
+	}
+
+	// Cancel the task
 	tr := true
 	rtask.Cancel = &tr
 	rtaskBytes, err := json.Marshal(*rtask)
@@ -362,37 +382,124 @@ func TestTaskPut(t *testing.T) {
 		t.Errorf("Marshal error: %v", err)
 		return
 	}
-
-	// Sleep long enough to make sure the task has been processed by taskRunner
-	time.Sleep(taskRunnerCycleTime * 2)
-	dtask := Task{}
-
-	// Validate the status is Running
-	err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
-	if err != nil {
-		t.Errorf("Could not deserialize task: %+v", err)
-		return
-	}
-	if dtask.Status == nil || *dtask.Status != Completed {
-		t.Errorf("task status is not Completed, is %s", *dtask.Status)
-		return
-	}
-
-	// Cancel the task
 	err = requestAndDeserialize(t, http.MethodPut, testServer.URL, rtaskBytes, rtask.Key(), &dtask)
 	if err != nil {
 		t.Errorf("could not deserialize task: %+v", err)
 		return
 	}
-	cncl := Canceling
-	task.Status = &cncl
-	exp := time.Now().Add(-1 * time.Minute).Format(dateFormat)
-	// The Equal function requires an expiration...
-	dtask.Expiration = &exp
-	rtask.Expiration = &exp
-	if !dtask.Equal(rtask, 0) {
-		t.Errorf("canceled and deserialized tasks are not equal, task: %+v, dtask: %+v", task, dtask)
+
+	// Sleep long enough to make sure the task has been processed by taskRunner
+	time.Sleep(taskRunnerCycleTime * 2)
+
+	// Validate the status is Canceled
+	err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
+	if err != nil {
+		t.Errorf("Could not deserialize task: %+v", err)
 		return
+	}
+	if dtask.Status == nil || *dtask.Status != Canceled {
+		t.Errorf("task status is not Canceled, task: %+v", dtask)
+		return
+	}
+}
+
+// Post new task, poll status until completed, download file and validate.
+func TestRoundTrip(t *testing.T) {
+	cmd := "ls -alt"
+	expectedFiles := []string{filenameFromCommand(cmd) + stderrFileSuffix, filenameFromCommand(cmd) + stdoutFileSuffix}
+	task := Task{Shell: []string{cmd}}
+	rtask, err := testTaskPost(t, task)
+	if err != nil {
+		t.Errorf("could not POST task: %+v", err)
+		return
+	}
+	rtaskBytes, err := json.Marshal(rtask)
+	if err != nil {
+		t.Errorf("marshal error: %v", err)
+		return
+	}
+	testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
+	defer testServerStatus.Close()
+	testServerTask := httptest.NewServer(http.HandlerFunc(handlerTask))
+	defer testServerTask.Close()
+
+	// Use query strings to ask for task and wait until done.
+	for {
+		query := "/?" + fmt.Sprintf("%s=%s", queryParamUUID, rtask.Key())
+
+		stasks := []Task{}
+		getAndUnmarshal(t, testServerStatus.URL+query, &stasks)
+
+		if len(stasks) != 1 {
+			t.Errorf("status returned incorrect data")
+		}
+		if stasks[0].Status != nil && *stasks[0].Status == Completed {
+			break
+		}
+	}
+
+	// Get the zip file
+	outputZipFilepath := filepath.Join(t.TempDir(), "test.zip")
+	out, err := os.Create(outputZipFilepath)
+	if err != nil {
+		t.Errorf("file create: %+v", err)
+	}
+	defer out.Close()
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodGet, testServerTask.URL, bytes.NewBuffer(rtaskBytes))
+	if err != nil {
+		t.Errorf("NewRequest error: %v", err)
+		return
+	}
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Errorf("request did not return proper status: %d", resp.StatusCode)
+		return
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		t.Errorf("file copy: %+v", err)
+	}
+	out.Close()
+
+	// Unzip the returned file and find files of the correct name.
+	_, processedPaths, errs := ziph.AsyncUnzip(outputZipFilepath, t.TempDir(), 2, 0755)
+	pathCount := 0
+	errCount := 0
+	for {
+		noMessage := false
+		select {
+		case pp, ok := <-processedPaths:
+			if ok {
+				if slices.Contains(expectedFiles, filepath.Base(pp)) {
+					pathCount++
+				}
+				lpf(logh.Info, "AsyncUnzip processed path: %s\n", pp)
+			} else {
+				processedPaths = nil
+			}
+		case err, ok := <-errs:
+			if ok {
+				errCount++
+				lpf(logh.Error, "error: %v\n", err)
+			} else {
+				errs = nil
+			}
+		default:
+			noMessage = true
+		}
+
+		if noMessage {
+			if processedPaths == nil && errs == nil {
+				lpf(logh.Info, "AsyncZip is done.")
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	if pathCount != len(expectedFiles) {
+		t.Errorf("wrong number of files, got %d, expected %d", pathCount, len(expectedFiles))
 	}
 }
 

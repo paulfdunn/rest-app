@@ -1,8 +1,18 @@
-// example-telemetry is an example of using github.com/paulfdunn/rest-app (a framework for a
-// GO (GOLANG) based ReST APIs) to create a service that does not include authentication, but
-// relies on a separate auth service to provide clients with authentication service. This service
-// is then called with a token provisioned from the separate authentication service, and this
-// service validates the token for paths requiring authentication.
+// example-telemetry is an example of using github.com/paulfdunn/rest-app (a framework for a GO
+// (GOLANG) based ReST APIs) to create a service that: accepts commands to run, runs those commands
+// and collects STDOUT/STDERR, then allows downloading the resulting data in a ZIP file. This
+// service does not include authentication, but relies on a separate auth service to provide clients
+// with authentication service. This service is then called with a token provisioned from the
+// separate authentication service, and this service validates the token for paths requiring
+// authentication.
+//
+// See test-example-telemetry.sh for a full working example that uses the API to send an "ls -al"
+// command and download the ZIP file.
+//
+// WARNING - There is no locking on Task objects. Once runner is running, no object updates
+// should occur other than those that occur within runner. I.E. don't update a Task in the
+// foreground while updates are happening in the background (go routine), or the foreground
+// updates will be lost.
 //
 // TODO: REGEX filter to reject unallowed command/shell
 package main
@@ -23,6 +33,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/paulfdunn/authJWT"
+	"github.com/paulfdunn/go-helper/archiveh/ziph"
 	"github.com/paulfdunn/go-helper/databaseh/kvs"
 	"github.com/paulfdunn/go-helper/logh"
 	"github.com/paulfdunn/go-helper/osh/exech"
@@ -34,19 +45,24 @@ import (
 type Task struct {
 	// Cancel -  Not valid on POST. If set to true on PUT will cancel the task; providing any other
 	// field besides UUID with a PUT is not valid.
-	Cancel *bool
+	Cancel *bool `json:",omitempty"`
 	// Command is a slice of strings of commands that are executed WITHOUT a shell.
-	Command []string
+	Command []string `json:",omitempty"`
 	// Expiration - date with format dateFormat; time is UTC, 24 hour notation. Default is
 	// defaultExpirationDuration from POST. Upon Expiration a task is Canceled if still running,
 	// and all files are deleted.
-	Expiration *string
+	Expiration *string `json:",omitempty"`
+	// Errors, ProcessCommand, ProcessShell, ProcessZip are status information provided as the task runs.
+	Errors         []error  `json:",omitempty"`
+	ProcessCommand []string `json:",omitempty"`
+	ProcessShell   []string `json:",omitempty"`
+	ProcessZip     []string `json:",omitempty"`
 	// Shell is a slice of strings of commands that are executed in a shell.
-	Shell []string
+	Shell []string `json:",omitempty"`
 	// Status is a value of type TaskStatus; output only, do not provide with PUT/POST.
-	Status *TaskStatus
+	Status *TaskStatus `json:",omitempty"`
 	// UUID is a UUID that is returned with a task POST
-	UUID *uuid.UUID
+	UUID *uuid.UUID `json:",omitempty"`
 }
 
 // type StatusDetail struct {
@@ -71,8 +87,6 @@ const (
 type runningTask struct {
 	cancelFunc context.CancelFunc
 	ctx        context.Context
-	processed  chan<- string
-	errors     chan<- error
 	task       *Task
 }
 
@@ -88,6 +102,7 @@ const (
 
 	stderrFileSuffix = ".stderr.txt"
 	stdoutFileSuffix = ".stdout.txt"
+	zipFileSuffix    = ".zip"
 
 	taskKeyCommand = "Command"
 	taskKeyShell   = "Shell"
@@ -116,8 +131,9 @@ var (
 	// This is a variable so it can be increased during testing.
 	maxTasks = 5
 	// task channels take a Task.Key()
-	taskCancel chan string
-	taskRun    chan string
+	taskCancel    chan string
+	taskCompleted chan string
+	taskRun       chan string
 )
 
 var (
@@ -226,17 +242,17 @@ func (tsk *Task) Equal(inputTask *Task, allowedExpirationDifference time.Duratio
 	diff := tskExp.Sub(inputExp).Abs()
 	if tsk.Key() == inputTask.Key() &&
 		diff <= allowedExpirationDifference &&
-		tsk.SliceLength(taskKeyCommand) == inputTask.SliceLength(taskKeyCommand) &&
-		tsk.SliceLength(taskKeyShell) == inputTask.SliceLength(taskKeyShell) {
-		if tsk.SliceLength(taskKeyCommand) > 0 {
-			for i := 0; i < tsk.SliceLength(taskKeyCommand); i++ {
+		tsk.sliceLength(taskKeyCommand) == inputTask.sliceLength(taskKeyCommand) &&
+		tsk.sliceLength(taskKeyShell) == inputTask.sliceLength(taskKeyShell) {
+		if tsk.sliceLength(taskKeyCommand) > 0 {
+			for i := 0; i < tsk.sliceLength(taskKeyCommand); i++ {
 				if tsk.Command[i] != inputTask.Command[i] {
 					return false
 				}
 			}
 		}
-		if tsk.SliceLength(taskKeyShell) > 0 {
-			for i := 0; i < tsk.SliceLength(taskKeyShell); i++ {
+		if tsk.sliceLength(taskKeyShell) > 0 {
+			for i := 0; i < tsk.sliceLength(taskKeyShell); i++ {
 				if tsk.Shell[i] != inputTask.Shell[i] {
 					return false
 				}
@@ -259,9 +275,24 @@ func (tsk *Task) Key() string {
 	return tsk.UUID.String()
 }
 
+// ZipFilePath creates the path to the created zip file.
+func (tsk Task) ZipFilePath() string {
+	return filepath.Join(tsk.Dir(), tsk.UUID.String()+zipFileSuffix)
+}
+
+// serialize stores a task in the KVS
+func (tsk *Task) serialize() error {
+	err := telemetryKVS.Serialize(tsk.Key(), tsk)
+	if err != nil {
+		lpf(logh.Error, "Serialize task: %+v", err)
+		return err
+	}
+	return nil
+}
+
 // SliceLength is used to get the length of one of the slice fields. This main utility of this function
 // is for Equal(ality) testing.
-func (tsk *Task) SliceLength(field string) int {
+func (tsk *Task) sliceLength(field string) int {
 	switch field {
 	case taskKeyCommand:
 		if tsk.Command == nil {
@@ -278,7 +309,155 @@ func (tsk *Task) SliceLength(field string) int {
 	return -1
 }
 
-func (rtm runningTaskMap) CancelExpiredTasks() {
+// updateTaskStatus will set the Task.Status to Task.Status; deserialization will overwrite any values in the
+// task. Only use to update Status
+func (tsk *Task) updateTaskStatus(status TaskStatus) error {
+	dtask := Task{}
+	err := telemetryKVS.Deserialize(tsk.Key(), &dtask)
+	if err != nil {
+		lpf(logh.Error, "Deserialize task: %+v", err)
+		return err
+	}
+	if dtask.UUID == nil || *dtask.UUID == uuid.Nil {
+		lpf(logh.Error, "updateTaskStatus received invalid task %s to cancel", tsk.Key())
+	}
+	stts := status
+	dtask.Status = &stts
+	err = telemetryKVS.Serialize(tsk.Key(), &dtask)
+	if err != nil {
+		lpf(logh.Error, "Serialize task: %+v", err)
+		return err
+	}
+	return nil
+}
+
+// String returns the string corresponding to a TaskStatus.
+// These are stored in a database and CANNOT BE REORDERED! Add new values to the end of the list.
+func (ts TaskStatus) String() string {
+	return [...]string{"Accepted", "Canceled", "Canceling", "Completed", "Expired", "Running"}[ts]
+}
+
+// runner does the work for a runningTask; it should be called in a Go routine from ScheduleTasks.
+// The work to do: execute all commands in task.Command, and task.Shell, and create the zip
+// file. Status is updates as it runs.
+// WARNING - There is no locking on Task objects. Once runner is running, no object updates
+// should occur other than those that occur within runner. I.E. don't update a Task in the
+// foreground while updates are happening in the background (go routine), or the foreground
+// updates will be lost.
+func (rt runningTask) runner() {
+	filepathsCmd := rt.runnerExec(true)
+	filepathsShell := rt.runnerExec(false)
+
+	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), append(filepathsCmd, filepathsShell...))
+	for {
+		noMessage := false
+		select {
+		case pp, ok := <-processedPaths:
+			if ok {
+				lpf(logh.Info, "AsyncZip processed path: %s\n", pp)
+				rt.task.ProcessZip = append(rt.task.ProcessZip, pp)
+			} else {
+				processedPaths = nil
+			}
+		case err, ok := <-errs:
+			if ok {
+				lpf(logh.Info, "AsyncZip error: %v\n", err)
+				rt.task.Errors = append(rt.task.Errors, err)
+			} else {
+				errs = nil
+			}
+		default:
+			noMessage = true
+		}
+
+		if noMessage {
+			if processedPaths == nil && errs == nil {
+				lpf(logh.Info, "AsyncZip is done, filepath: %s", rt.task.ZipFilePath())
+				break
+			}
+
+			// Save status information.
+			telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+
+			time.Sleep(time.Second)
+		}
+	}
+
+	cmplt := Completed
+	rt.task.Status = &cmplt
+	telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+
+	lpf(logh.Info, "task %s completed", rt.task.UUID.String())
+	taskCompleted <- rt.task.Key()
+}
+
+// runnerExec runs the runningTask.task.Command and runningTask.task.Shell commands
+func (rt runningTask) runnerExec(command bool) []string {
+	var execList []string
+	if command {
+		execList = rt.task.Command
+	} else {
+		execList = rt.task.Shell
+	}
+	// Each command generates 2 files; stdout and stderr
+	filepaths := make([]string, 0, len(execList)*2)
+	if execList != nil && len(execList) > 0 {
+		for _, cmdAndArgs := range execList {
+			select {
+			case <-rt.ctx.Done():
+				cncl := Canceled
+				rt.task.Status = &cncl
+				telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+				// return rt.ctx.Err()
+				return filepaths
+			default:
+			}
+
+			cmdSplit := strings.Fields(cmdAndArgs)
+			var args []string
+			if len(cmdSplit) > 1 {
+				args = cmdSplit[1:]
+			}
+
+			cmdToFileName := filenameFromCommand(cmdAndArgs)
+			stderr, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stderrFileSuffix))
+			if err != nil {
+				lpf(logh.Error, "os.Create: %+v", err)
+				rt.task.Errors = append(rt.task.Errors, err)
+			}
+			defer stderr.Close()
+			stdout, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stdoutFileSuffix))
+			if err != nil {
+				lpf(logh.Error, "os.Create: %+v", err)
+				rt.task.Errors = append(rt.task.Errors, err)
+			}
+			defer stdout.Close()
+			filepaths = append(filepaths, stderr.Name(), stdout.Name())
+
+			ea := exech.ExecArgs{Args: args, Command: cmdSplit[0], Context: rt.ctx, Stderr: stderr, Stdout: stdout}
+			var rc int
+			if command {
+				rc, err = exech.ExecCommandContext(&ea)
+				rt.task.ProcessCommand = append(rt.task.ProcessCommand, cmdAndArgs)
+			} else {
+				rc, err = exech.ExecShellContext(&ea)
+				rt.task.ProcessShell = append(rt.task.ProcessShell, cmdAndArgs)
+			}
+			if rc != 0 {
+				lpf(logh.Error, "non-zero return code %d for command: %t, cmdAndArgs: %s", rc, command, cmdAndArgs)
+			}
+			if err != nil {
+				rt.task.Errors = append(rt.task.Errors, err)
+			}
+
+			// Save status information.
+			telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+		}
+	}
+	return filepaths
+}
+
+func (rtm runningTaskMap) cancelExpiredTasks() {
 	// Check running tasks for expiration and cancel when expired.
 	for key := range rtm {
 		dtask := Task{}
@@ -297,79 +476,7 @@ func (rtm runningTaskMap) CancelExpiredTasks() {
 	}
 }
 
-func (rt runningTask) runner() {
-	// Size the errors channel large enough for each task plus an error each creating stdout/stderr.
-	rt.errors = make(chan error, len(rt.task.Command)+len(rt.task.Shell)+2)
-	// Size the processed channel large enough for each task to return its command.
-	rt.processed = make(chan string, len(rt.task.Command)+len(rt.task.Shell))
-
-	rt.runnerExec(true)
-	rt.runnerExec(false)
-	err := updateTaskStatus(rt.task.Key(), Completed)
-	if err != nil {
-		lpf(logh.Error, "updateTaskStatus: %+v", err)
-	}
-}
-
-func (rt runningTask) runnerExec(command bool) {
-	var execList []string
-	if command {
-		execList = rt.task.Command
-	} else {
-		execList = rt.task.Shell
-	}
-	if execList != nil && len(execList) > 0 {
-		for _, cmdAndArgs := range execList {
-			select {
-			case <-rt.ctx.Done():
-				// return rt.ctx.Err()
-				return
-			default:
-			}
-
-			cmdSplit := strings.Fields(cmdAndArgs)
-			var args []string
-			if len(cmdSplit) > 1 {
-				args = cmdSplit[1:]
-			}
-
-			cmdToFileName := filenameFromCommand(cmdSplit[0])
-			stderr, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stderrFileSuffix))
-			if err != nil {
-				lpf(logh.Error, "os.Create: %+v", err)
-				rt.errors <- err
-			}
-			defer stderr.Close()
-			stdout, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stdoutFileSuffix))
-			if err != nil {
-				lpf(logh.Error, "os.Create: %+v", err)
-				rt.errors <- err
-			}
-			defer stdout.Close()
-			// var stdout, stderr bytes.Buffer
-
-			ea := exech.ExecArgs{Args: args, Command: cmdSplit[0], Context: rt.ctx, Stderr: stderr, Stdout: stdout}
-			var rc int
-			if command {
-				rc, err = exech.ExecCommandContext(&ea)
-			} else {
-				rc, err = exech.ExecShellContext(&ea)
-			}
-			if rc != 0 {
-				lpf(logh.Error, "non-zero return code %d for command: %t, cmdAndArgs: %s", rc, command, cmdAndArgs)
-			}
-			if err != nil {
-				rt.errors <- err
-			}
-			rt.processed <- cmdSplit[0]
-
-			// TODO: output status data
-			lpf(logh.Info, "task %s completed", rt.task.UUID.String())
-		}
-	}
-}
-
-func (rtm runningTaskMap) ScheduleTasks() {
+func (rtm runningTaskMap) scheduleTasks() {
 	if len(rtm) < maxTasks {
 		select {
 		case key := <-taskRun:
@@ -385,25 +492,19 @@ func (rtm runningTaskMap) ScheduleTasks() {
 			}
 			lpf(logh.Info, "ScheduleTasks accepting task %s", key)
 			ctx, cancelFunc := context.WithCancel(context.Background())
-			rt := runningTask{cancelFunc: cancelFunc, ctx: ctx, task: &dtask}
-			rtm[key] = rt
-			err = updateTaskStatus(key, Running)
+			err = dtask.updateTaskStatus(Running)
 			if err != nil {
 				lpf(logh.Error, "updateTaskStatus: %+v", err)
 			}
+			rt := runningTask{cancelFunc: cancelFunc, ctx: ctx, task: &dtask}
+			rtm[key] = rt
 			go rt.runner()
 		default:
 		}
 	}
 }
 
-// String returns the string corresponding to a TaskStatus.
-// These are stored in a database and CANNOT BE REORDERED! Add new values to the end of the list.
-func (ts TaskStatus) String() string {
-	return [...]string{"Accepted", "Canceled", "Canceling", "Completed", "Expired", "Running"}[ts]
-}
-
-// deleteExpiredTasks shoudl be called at startup, prior to starting any task management,
+// deleteExpiredTasks should be called at startup, prior to starting any task management,
 // to remove expired tasks from the datastore.
 func deleteExpiredTasks() {
 	keys, err := telemetryKVS.Keys()
@@ -429,7 +530,7 @@ func deleteExpiredTasks() {
 			if err := os.RemoveAll(dtask.Dir()); err != nil {
 				lpf(logh.Error, "delete data directory %s error:%v", dtask.Dir(), err)
 			}
-			err := updateTaskStatus(key, Canceled)
+			err := dtask.updateTaskStatus(Canceled)
 			if err != nil {
 				lpf(logh.Error, "updateTaskStatus: %+v", err)
 			}
@@ -439,7 +540,7 @@ func deleteExpiredTasks() {
 
 func filenameFromCommand(cmd string) string {
 	// Replace characters in the command that are not valid for a file name.
-	re := regexp.MustCompile(`[` + "`" + `~!@#$%^&*()+=\{\[\}\]\|\?\\/><,\.';:"]+`)
+	re := regexp.MustCompile(`[` + "`" + ` ~!@#$%^&*()+=\{\[\}\]\|\?\\/><,\.';:"]+`)
 	return re.ReplaceAllString(cmd, "_")
 }
 
@@ -456,6 +557,7 @@ func initializeKVS(datasourcePath string, filename string) {
 func initializeTaskInfrastructure() {
 	taskRun = make(chan string)
 	taskCancel = make(chan string)
+	taskCompleted = make(chan string)
 	go func() {
 		taskRunner()
 	}()
@@ -481,54 +583,40 @@ func startupAddRunningTasks() {
 	}
 }
 
-// updateTaskStatus will set the Task.Status to Task.Status
-func updateTaskStatus(key string, status TaskStatus) error {
-	dtask := Task{}
-	err := telemetryKVS.Deserialize(key, &dtask)
-	if err != nil {
-		lpf(logh.Error, "Deserialize task: %+v", err)
-		return err
-	}
-	if dtask.UUID == nil || *dtask.UUID == uuid.Nil {
-		lpf(logh.Error, "updateTaskStatus received invalid task %s to cancel", key)
-	}
-	stts := status
-	dtask.Status = &stts
-	err = telemetryKVS.Serialize(key, &dtask)
-	if err != nil {
-		lpf(logh.Error, "Serialize task: %+v", err)
-		return err
-	}
-	return nil
-}
-
 // taskRunner accepts new tasks on the taskRun channel. Callers will be blocked until the task
 // is accepted.
 func taskRunner() {
 	runningTasks := make(runningTaskMap)
 	for {
-		// TODO - this is incorrect. This needs to get the channels, send cancel, wait for channels to close.
 		select {
 		case key := <-taskCancel:
 			if _, ok := runningTasks[key]; ok {
+				// Status is set when cancel is recognized
 				runningTasks[key].cancelFunc()
-				err := updateTaskStatus(key, Canceled)
-				if err != nil {
-					lpf(logh.Error, "updateTaskStatus: %+v", err)
-				}
 				delete(runningTasks, key)
 				lpf(logh.Info, "task %s canceled", key)
 			} else {
-				lpf(logh.Error, "taskRunner received invalid task %s to cancel", key)
+				dtask := Task{}
+				err := telemetryKVS.Deserialize(key, &dtask)
+				if err != nil {
+					log.Fatalf("Deserialize task: %+v", err)
+				}
+				dtask.updateTaskStatus(Canceled)
+				lpf(logh.Warning, "taskRunner received non-running task %s to cancel", key)
 			}
 			// Allow cancelation requests to short circuit the loop as they may be done programatically
 			// and it would be best to not block callers.
 			continue
+		case key := <-taskCompleted:
+			delete(runningTasks, key)
+			lpf(logh.Info, "task %s removed from runningTasks", key)
+			// Allow another task to start quickly it there is one waiting.
+			continue
 		default:
 		}
 
-		runningTasks.CancelExpiredTasks()
-		runningTasks.ScheduleTasks()
+		runningTasks.cancelExpiredTasks()
+		runningTasks.scheduleTasks()
 
 		time.Sleep(taskRunnerCycleTime)
 	}

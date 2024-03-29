@@ -72,6 +72,21 @@ if [[ $HTTP_STATUS != 200 ]]; then
     exitOnError
 fi
 
+echo -e "\n\n Create a task."
+HTTP_STATUS=$(curl -k -s -w "\n|HTTP_STATUS=%{http_code}|\n" -d '{"Shell":["ls -al"]}'\
+    -H "Authorization: Bearer $TOKEN_ADMIN" \
+    https://127.0.0.1:8080/task/ | \
+    grep HTTP_STATUS | grep -o -E [0-9]*)
+if [[ $HTTP_STATUS != 201 ]]; then
+    echo "task create failed"
+    exitOnError
+fi
+
+echo -e "\n\n Get the task status"
+curl -k -s \
+    -H "Authorization: Bearer $TOKEN_ADMIN" \
+    https://127.0.0.1:8080/status/
+
 echo -e "\n\n"
 cat example-telemetry.log.0
 echo -e "\n\n"
