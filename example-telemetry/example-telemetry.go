@@ -309,21 +309,11 @@ func (tsk *Task) sliceLength(field string) int {
 	return -1
 }
 
-// updateTaskStatus will set the Task.Status to Task.Status; deserialization will overwrite any values in the
-// task. Only use to update Status
+// updateTaskStatus will set the Task.Status to Task.Status
 func (tsk *Task) updateTaskStatus(status TaskStatus) error {
-	dtask := Task{}
-	err := telemetryKVS.Deserialize(tsk.Key(), &dtask)
-	if err != nil {
-		lpf(logh.Error, "Deserialize task: %+v", err)
-		return err
-	}
-	if dtask.UUID == nil || *dtask.UUID == uuid.Nil {
-		lpf(logh.Error, "updateTaskStatus received invalid task %s to cancel", tsk.Key())
-	}
 	stts := status
-	dtask.Status = &stts
-	err = telemetryKVS.Serialize(tsk.Key(), &dtask)
+	tsk.Status = &stts
+	err := telemetryKVS.Serialize(tsk.Key(), &tsk)
 	if err != nil {
 		lpf(logh.Error, "Serialize task: %+v", err)
 		return err
@@ -345,11 +335,19 @@ func (ts TaskStatus) String() string {
 // foreground while updates are happening in the background (go routine), or the foreground
 // updates will be lost.
 func (rt runningTask) runner() {
+	var filepathsShell []string
 	filepathsCmd := rt.runnerExec(true)
-	filepathsShell := rt.runnerExec(false)
+	// Task might have been canceled.
+	if *rt.task.Status == Running {
+		filepathsShell = rt.runnerExec(false)
+	}
 
 	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), append(filepathsCmd, filepathsShell...))
 	for {
+		// Task might have been canceled.
+		if *rt.task.Status == Running {
+			break
+		}
 		noMessage := false
 		select {
 		case pp, ok := <-processedPaths:
@@ -383,8 +381,12 @@ func (rt runningTask) runner() {
 		}
 	}
 
-	cmplt := Completed
-	rt.task.Status = &cmplt
+	// The task may have been canceled or otherwise have had the status updated.
+	// Only change to Completed if the current status is Running.
+	if *rt.task.Status == Running {
+		cmplt := Completed
+		rt.task.Status = &cmplt
+	}
 	telemetryKVS.Serialize(rt.task.Key(), &rt.task)
 
 	lpf(logh.Info, "task %s completed", rt.task.UUID.String())
