@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,10 +23,12 @@ import (
 )
 
 type expectedResponse struct {
-	httpMethod  string
-	task        Task
-	httpResonse int
 	handlerFunc http.HandlerFunc
+	httpMethod  string
+	httpResonse int
+	invalidKeys []string
+	query       string
+	task        *Task
 }
 
 func init() {
@@ -56,9 +59,13 @@ func ExampleTaskStatus() {
 	// TaskStatus[4]: Expired
 	// TaskStatus[5]: Running
 }
+
+// TestTaskEqual tests the Task.Equal function.
+// Since the UUID is the key in the KVS, there is no need to test with it being nil.
+// Expiration must also be not nil; don't test with nil.
 func TestTaskEqual(t *testing.T) {
-	// Since the UUID is the key in the KVS, there is no need to test with it being nil.
-	// Expiration must also be not nil; don't test with nil.
+	// Validate that comparing a Task to itself, or one with the same UUID, passes and comparing
+	// to a Task with a different UUID fails. Other values and slices are all nil.
 	durDiff := time.Second * 30
 	exp := "2024-03-25 18:30:00"
 	uuid1 := uuid.New()
@@ -67,45 +74,92 @@ func TestTaskEqual(t *testing.T) {
 	t2 := Task{UUID: &uuid1, Expiration: &exp}
 	t3 := Task{UUID: &uuid2, Expiration: &exp}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail,durDiffs with just UUID")
+		t.Error("Task.Equal fail, just UUID")
 	}
 
-	t4 := Task{UUID: &uuid1, Command: []string{}, Expiration: &exp, Shell: []string{}}
-	t5 := Task{UUID: &uuid1, Command: []string{}, Expiration: &exp, Shell: []string{}}
-	t6 := Task{UUID: &uuid2, Command: []string{}, Expiration: &exp, Shell: []string{}}
-	if !t4.Equal(&t4, durDiff) || !t4.Equal(&t5, durDiff) || t4.Equal(&t6, durDiff) {
-		t.Error("Task.Equal fail,durDiffs with UUID and empty Command/Shell")
+	// Validate that comparing a Task to itself, or one with the same UUID, passes and comparing
+	// to a Task with a different UUID fails. Slices are all non-nil but empty.
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t3 = Task{UUID: &uuid2, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and empty Command/Shell")
 	}
 
-	t7 := Task{UUID: &uuid1, Command: []string{"some_command", "other_command"}, Expiration: &exp, Shell: []string{"ls -al"}}
-	t8 := Task{UUID: &uuid1, Command: []string{"some_command", "other_command"}, Expiration: &exp, Shell: []string{"ls -al"}}
-	t9 := Task{UUID: &uuid2, Command: []string{"Some_command", "Other_command"}, Expiration: &exp, Shell: []string{"ls -AL"}}
-	t10 := Task{UUID: &uuid2, Command: []string{"Some_command"}, Expiration: &exp, Shell: []string{"ls -AL"}}
-	if !t7.Equal(&t7, durDiff) || !t7.Equal(&t8, durDiff) || t7.Equal(&t9, durDiff) || t7.Equal(&t10, durDiff) {
-		t.Error("Task.Equal fail,durDiffs with UUID and empty Command/Shell")
+	// Test each value field, all with the same UUID.
+	// test Cancel
+	tr := true
+	fl := false
+	t1 = Task{UUID: &uuid1, Cancel: &tr, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: &tr, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t3 = Task{UUID: &uuid1, Cancel: &fl, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and Cancel with value")
+	}
+	// test Command
+	sl1 := "some_value"
+	sl2 := "Some_value"
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl1}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl1}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl2}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and Cancel with value")
+	}
+	// test ProcessCommand
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{sl1}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{sl1}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{sl2}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and ProcessCommand with value")
+	}
+	// test ProcessShell
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{sl1}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{sl1}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{sl2}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and ProcessShell with value")
+	}
+	// test ProcessZip
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{sl1}, Shell: []string{}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{sl1}, Shell: []string{}, Status: nil}
+	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{sl2}, Shell: []string{}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and ProcessZip with value")
+	}
+	// test Shell
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{sl1}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{sl1}, Status: nil}
+	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{sl2}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and Shell with value")
+	}
+	// test Status
+	accptd := Accepted
+	rnng := Running
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: &accptd}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: &accptd}
+	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: &rnng}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and Status with value")
 	}
 
+	// Validate that allowedExpirationDifference is working properly by testing: the same expiration, a value
+	// one second within range, and one second outside the range.
 	exp1 := "2024-03-25 18:31:00"
 	exp2 := "2024-03-25 18:31:29"
 	// Set 1 second out of the allowed range and fail if equal.
 	exp3 := "2024-03-25 18:31:31"
-	t11 := Task{UUID: &uuid1, Command: []string{}, Expiration: &exp1, Shell: []string{}}
-	t12 := Task{UUID: &uuid1, Command: []string{}, Expiration: &exp2, Shell: []string{}}
-	t13 := Task{UUID: &uuid1, Command: []string{}, Expiration: &exp3, Shell: []string{}}
-	if !t11.Equal(&t11, durDiff) || !t11.Equal(&t12, durDiff) || t11.Equal(&t13, durDiff) {
+	t1 = Task{UUID: &uuid1, Command: []string{}, Expiration: &exp1, Shell: []string{}}
+	t2 = Task{UUID: &uuid1, Command: []string{}, Expiration: &exp2, Shell: []string{}}
+	t3 = Task{UUID: &uuid1, Command: []string{}, Expiration: &exp3, Shell: []string{}}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
 		t.Error("Task.Equal fails with duration issues.")
 	}
 }
 
-// TestExpectedResponse are tests to validate API requirements for parameters. A task is sent, and
+// TestExpectedResponse are tests to validate API requirements for parameters. An API call is made, and
 // the resp.StatusCode is validated against what is expected.
 func TestExpectedResponse(t *testing.T) {
-	cancelTrue := true
-	cancelFalse := false
-	command := []string{"cmd"}
-	exp := time.Now().Add(time.Minute).Format(dateFormat)
-	status := Accepted
-	shell := []string{"shell"}
 	invalidUUID := uuid.New()
 	validUUID := uuid.New()
 	task := Task{UUID: &validUUID}
@@ -117,23 +171,11 @@ func TestExpectedResponse(t *testing.T) {
 	expectedResponses := []expectedResponse{}
 
 	// http.MethoDelete tests
-	// Delete can only provide the UUID
-	task = Task{}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{UUID: &invalidUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Command: command, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	// Make sure the time is in the future.
-	task = Task{Expiration: &exp, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Status: &status, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	task = Task{Shell: shell, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, http.StatusBadRequest, handlerTask})
-	// Task status must be one of Canceled, Completed, or Expired
+	// negative tests - invalid UUID
+	task1 := Task{UUID: &invalidUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodDelete, http.StatusBadRequest, nil, "?uuid=" + invalidUUID.String(), &task1})
+	// positive tests - for a valid UUID, the Task status must be one of Canceled, Completed, or Expired. So
+	// create valid tasks and test against those.
 	for i := Accepted; i <= Running; i++ {
 		vu := uuid.New()
 		st := i
@@ -143,82 +185,62 @@ func TestExpectedResponse(t *testing.T) {
 		if err != nil {
 			t.Errorf("Serialize error: %+v", err)
 		}
-		task := Task{UUID: &vu}
-		var status int
+		var expectedStatus int
 		switch i {
 		case Canceled, Completed, Expired:
-			status = http.StatusNoContent
+			expectedStatus = http.StatusNoContent
 		default:
-			status = http.StatusBadRequest
+			expectedStatus = http.StatusBadRequest
 		}
-		expectedResponses = append(expectedResponses, expectedResponse{http.MethodDelete, task, status, handlerTask})
+		expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodDelete, expectedStatus, nil, "?uuid=" + vu.String(), nil})
 	}
 
 	// http.MethodGet tests
-	// Get with invalid UUID
-	task = Task{UUID: &invalidUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodGet, task, http.StatusBadRequest, handlerTask})
+	// negative tests - invalid UUID
+	task4 := Task{UUID: &invalidUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodGet, http.StatusBadRequest, nil, "?uuid=" + invalidUUID.String(), &task4})
 
 	// http.MethodPost tests
 	// Post with a UUID is not valid
-	task = Task{UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
-	// POST with a Status (loop 0) or Cancel (loop1) are not valid
-	task = Task{Status: &status}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
-	// POST with a expiration in the past is not valid.
-	task = Task{Expiration: &exp}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPost, task, http.StatusBadRequest, handlerTask})
+	task5 := Task{UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPost, http.StatusBadRequest, nil, "", &task5})
+	task6 := Task{}
+	// TODO: taskKeyErrors should be in this list but won't unmarshal
+	ik := []string{taskKeyCancel, taskKeyProcessCommand,
+		taskKeyProcessShell, taskKeyProcessZip, taskKeyStatus}
+	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPost, http.StatusBadRequest, ik, "", &task6})
 
 	// http.MethodPut tests
-	// PUT without both Cancel and UUID, with an invalid UUID, or with a Command, Expiration,
-	// Shell, or Status are not valid.
-	task = Task{Cancel: &cancelTrue}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, Command: command, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	// Make sure the time is in the future.
-	exp = time.Now().Add(time.Minute).Format(dateFormat)
-	task = Task{Cancel: &cancelTrue, Expiration: &exp, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	status = Accepted
-	task = Task{Cancel: &cancelTrue, Status: &status, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, Shell: shell, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelTrue, UUID: &invalidUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
-	task = Task{Cancel: &cancelFalse, UUID: &validUUID}
-	expectedResponses = append(expectedResponses, expectedResponse{http.MethodPut, task, http.StatusBadRequest, handlerTask})
+	// PUT is only valid with both Cancel==true and a valid UUID
+	tr := true
+	task7 := Task{UUID: &validUUID}
+	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPut, http.StatusBadRequest, nil, "", &task7})
+	task8 := Task{UUID: &validUUID, Cancel: &tr}
+	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPut, http.StatusAccepted, nil, "", &task8})
+	task9 := Task{UUID: &validUUID}
+	// TODO: taskKeyErrors should be in this list but won't unmarshal
+	ik = []string{taskKeyCommand, taskKeyExpiration, taskKeyProcessCommand,
+		taskKeyProcessShell, taskKeyProcessZip, taskKeyShell, taskKeyStatus}
+	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPut, http.StatusBadRequest, ik, "", &task9})
 
-	for i := 0; i < len(expectedResponses); i++ {
-		testServer := httptest.NewServer(http.HandlerFunc(expectedResponses[i].handlerFunc))
-		defer testServer.Close()
-
-		taskBytes, err := json.Marshal(expectedResponses[i].task)
-		if err != nil {
-			t.Errorf("Marshal error: %v", err)
-			return
+	for i, er := range expectedResponses {
+		if i == 11 {
+			fmt.Println("")
 		}
-		client := &http.Client{}
-		req, err := http.NewRequest(expectedResponses[i].httpMethod, testServer.URL, bytes.NewBuffer(taskBytes))
-		if err != nil {
-			t.Errorf("NewRequest error: %v", err)
-			return
-		}
-		resp, err := client.Do(req)
-		if err != nil || resp.StatusCode != expectedResponses[i].httpResonse {
-			t.Errorf("%s %d with status did not return proper status: %d", expectedResponses[i].httpMethod, i, resp.StatusCode)
-			return
+		if er.invalidKeys != nil {
+			for _, invalidKey := range er.invalidKeys {
+				er.task.setKey(invalidKey, true)
+				er.test(t, i)
+				er.task.setKey(invalidKey, false)
+			}
+		} else {
+			er.test(t, i)
 		}
 	}
 }
 
-// TestStatus POSTs several tasks, and validates it can get one or all.
+// TestStatus POSTs several tasks, and validates it can get a single status with a query string and
+// that it can get all status for all created tasks.
 func TestStatus(t *testing.T) {
 	testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
 	defer testServerStatus.Close()
@@ -261,8 +283,58 @@ func TestStatus(t *testing.T) {
 	}
 }
 
-// TestTaskDelete does a POST to create a task, updates the status to Completed, then deletes that task.
-func TestTaskDelete(t *testing.T) {
+// TestTaskPost verifies POSTs with default and specified expirations
+// run and complete. Verification is done by reading the KVS
+func TestTaskPost(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
+	defer testServer.Close()
+
+	// Loop0 - POST a task with no expiration and validate it is set to the default.
+	// Loop1 - POST a task with an expiration that is not default.
+	cmd := []string{"ls"}
+	for i := 0; i <= 1; i++ {
+		var task Task
+		// Pick an expiration that is NOT default, and will never be default.
+		expOffset := time.Duration(defaultExpirationDuration * 2)
+		task = Task{Shell: cmd}
+		if i == 1 {
+			es := time.Now().UTC().Add(expOffset).Format(dateFormat)
+			task = Task{Expiration: &es, Shell: cmd}
+		}
+
+		rtask, err := testTaskPost(t, task)
+		if err != nil {
+			t.Errorf("could not POST task: %+v", err)
+			return
+		}
+
+		// Sleep long enough to make sure the task has been processed by taskRunner
+		time.Sleep(taskRunnerCycleTime * 2)
+		// Add the UUID, Accepted Status, and Expiration to the sent task and compare to the deserialized task
+		task.UUID = rtask.UUID
+		sts := Completed
+		task.Status = &sts
+		task.ProcessShell = cmd
+		exp := time.Now().UTC().Add(defaultExpirationDuration).Format(dateFormat)
+		if i == 1 {
+			exp = time.Now().UTC().Add(expOffset).Format(dateFormat)
+		}
+		task.Expiration = &exp
+		dtask := Task{}
+		err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
+		if err != nil {
+			t.Errorf("Could not deserialize task: %+v", err)
+			return
+		}
+		if !dtask.Equal(&task, time.Second*20) {
+			t.Errorf("Sent and deserialized tasks are not equal, \ntask: %+v, \ndtask: %+v", task, dtask)
+			return
+		}
+	}
+}
+
+// TestTaskPostAndDelete does a POST to create a task, updates the status to Completed, then deletes that task.
+func TestTaskPostAndDelete(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
 	defer testServer.Close()
 
@@ -270,11 +342,6 @@ func TestTaskDelete(t *testing.T) {
 	rtask, err := testTaskPost(t, task)
 	if err != nil {
 		t.Errorf("could not POST task: %+v", err)
-		return
-	}
-	rtaskBytes, err := json.Marshal(rtask)
-	if err != nil {
-		t.Errorf("marshal error: %v", err)
 		return
 	}
 
@@ -290,7 +357,7 @@ func TestTaskDelete(t *testing.T) {
 		t.Errorf("Serialize error: %+v", err)
 	}
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodDelete, testServer.URL, bytes.NewBuffer(rtaskBytes))
+	req, err := http.NewRequest(http.MethodDelete, testServer.URL+"?uuid="+rtask.UUID.String(), nil)
 	if err != nil {
 		t.Errorf("NewRequest error: %v", err)
 		return
@@ -302,54 +369,8 @@ func TestTaskDelete(t *testing.T) {
 	}
 }
 
-// TestTaskPost verifies a POST with no expiration gets the default,
-// and that a valid POST results in the object correctly being in the KVS.
-func TestTaskPost(t *testing.T) {
-	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
-	defer testServer.Close()
-
-	// Loop0 - POST a task with no expiration and validate it is set to the default.
-	// Loop1 - POST a task with an expiration that is not default and validate what is in the KVS.
-	for i := 0; i <= 1; i++ {
-		var task Task
-		// Pick an expiration that is NOT default, and will never be default.
-		expOffset := time.Duration(defaultExpirationDuration * 2)
-		task = Task{Shell: []string{"ls"}}
-		if i == 1 {
-			es := time.Now().UTC().Add(expOffset).Format(dateFormat)
-			task = Task{Expiration: &es, Shell: []string{"ls"}}
-		}
-
-		rtask, err := testTaskPost(t, task)
-		if err != nil {
-			t.Errorf("could not POST task: %+v", err)
-			return
-		}
-
-		// Add the UUID, Accepted Status, and Expiration to the sent task and compare to the deserialized task
-		task.UUID = rtask.UUID
-		acpt := Accepted
-		task.Status = &acpt
-		exp := time.Now().UTC().Add(defaultExpirationDuration).Format(dateFormat)
-		if i == 1 {
-			exp = time.Now().UTC().Add(expOffset).Format(dateFormat)
-		}
-		task.Expiration = &exp
-		dtask := Task{}
-		err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
-		if err != nil {
-			t.Errorf("Could not deserialize task: %+v", err)
-			return
-		}
-		if !dtask.Equal(&task, time.Second*5) {
-			t.Errorf("Sent and deserialized tasks are not equal, task: %+v, dtask: %+v", task, dtask)
-			return
-		}
-	}
-}
-
-// TestTaskPut POSTs a new task, validates it status gets changed to Completed, and validates canceling that task
-func TestTaskPut(t *testing.T) {
+// TestTaskPostAndCancel POSTs a new task, validates it status gets changed to Completed, and validates canceling that task
+func TestTaskPostAndCancel(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(handlerTask))
 	defer testServer.Close()
 
@@ -413,11 +434,6 @@ func TestRoundTrip(t *testing.T) {
 		t.Errorf("could not POST task: %+v", err)
 		return
 	}
-	rtaskBytes, err := json.Marshal(rtask)
-	if err != nil {
-		t.Errorf("marshal error: %v", err)
-		return
-	}
 	testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
 	defer testServerStatus.Close()
 	testServerTask := httptest.NewServer(http.HandlerFunc(handlerTask))
@@ -446,7 +462,8 @@ func TestRoundTrip(t *testing.T) {
 	}
 	defer out.Close()
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, testServerTask.URL, bytes.NewBuffer(rtaskBytes))
+	query := fmt.Sprintf(`?uuid=%s`, rtask.UUID.String())
+	req, err := http.NewRequest(http.MethodGet, testServerTask.URL+query, nil)
 	if err != nil {
 		t.Errorf("NewRequest error: %v", err)
 		return
@@ -500,6 +517,78 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if pathCount != len(expectedFiles) {
 		t.Errorf("wrong number of files, got %d, expected %d", pathCount, len(expectedFiles))
+	}
+}
+
+func (er expectedResponse) test(t *testing.T, i int) {
+	testServer := httptest.NewServer(http.HandlerFunc(er.handlerFunc))
+	defer testServer.Close()
+
+	taskBytes, err := json.Marshal(er.task)
+	if err != nil {
+		t.Errorf("Marshal error: %v", err)
+		return
+	}
+	client := &http.Client{}
+	req, err := http.NewRequest(er.httpMethod, testServer.URL+er.query, bytes.NewBuffer(taskBytes))
+	if err != nil {
+		t.Errorf("NewRequest error: %v", err)
+		return
+	}
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != er.httpResonse {
+		t.Errorf("i: %d, method: %s, task: %+v, did not return proper status, reveived: %d, expected status: %d", i, er.httpMethod, er.task, resp.StatusCode, er.httpResonse)
+		return
+	}
+}
+
+// setKey will either set or clear a key for testing.
+func (tsk *Task) setKey(key string, set bool) {
+	if set {
+		switch key {
+		case taskKeyCancel:
+			tr := true
+			tsk.Cancel = &tr
+		case taskKeyCommand:
+			tsk.Command = []string{"nothing"}
+		case taskKeyErrors:
+			tsk.Errors = []error{errors.New("nothing")}
+		case taskKeyExpiration:
+			exp := time.Now().Add(time.Minute).Format(dateFormat)
+			tsk.Expiration = &exp
+		case taskKeyProcessCommand:
+			tsk.ProcessCommand = []string{"nothing"}
+		case taskKeyProcessShell:
+			tsk.ProcessShell = []string{"nothing"}
+		case taskKeyProcessZip:
+			tsk.ProcessZip = []string{"nothing"}
+		case taskKeyShell:
+			tsk.Shell = []string{"nothing"}
+		case taskKeyStatus:
+			accptd := Accepted
+			tsk.Status = &accptd
+		}
+	} else {
+		switch key {
+		case taskKeyCancel:
+			tsk.Cancel = nil
+		case taskKeyCommand:
+			tsk.Command = nil
+		case taskKeyErrors:
+			tsk.Errors = nil
+		case taskKeyExpiration:
+			tsk.Expiration = nil
+		case taskKeyProcessCommand:
+			tsk.ProcessCommand = nil
+		case taskKeyProcessShell:
+			tsk.ProcessShell = nil
+		case taskKeyProcessZip:
+			tsk.ProcessZip = nil
+		case taskKeyShell:
+			tsk.Shell = nil
+		case taskKeyStatus:
+			tsk.Status = nil
+		}
 	}
 }
 

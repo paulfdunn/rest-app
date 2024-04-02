@@ -4,6 +4,5 @@ use (
 	.
 	./core
 	./example-auth-as-service
-	./example-standalone
 	./example-telemetry
 )

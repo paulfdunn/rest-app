@@ -1,8 +1,7 @@
 // example-auth-as-service is an example of using github.com/paulfdunn/rest-app (a framework for a
-// GO (GOLANG) based ReST APIs) to create a service that does not include authentication, but
-// relies on a separate auth service to provide clients with authentication service. This service
-// is then called with a token provisioned from the separate authentication service, and this
-// service validates the token for paths requiring authentication.
+// GO (GOLANG) based ReST APIs) to create a standalone application that
+// uses github.com/paulfdunn/authJWT for authentication.
+// This application includes the authentication directly in the service.
 package main
 
 import (
@@ -22,10 +21,12 @@ import (
 )
 
 const (
+	authFileSuffix = ".auth.db"
 	// relative file paths will be joined with appPath to create the path to the file.
-	relativeCertFilePath  = "/key/rest-app.crt"
-	relativeKeyFilePath   = "/key/rest-app.key"
-	relativePublicKeyPath = "../example-standalone/key/jwt.rsa.public"
+	relativeCertFilePath   = "/key/rest-app.crt"
+	relativeKeyFilePath    = "/key/rest-app.key"
+	relativePrivateKeyPath = "/key/jwt.rsa.private"
+	relativePublicKeyPath  = "../example-auth-as-service/key/jwt.rsa.public"
 )
 
 var (
@@ -42,6 +43,10 @@ var (
 	// logh function pointers make logging calls more compact, but are optional.
 	lp  func(level logh.LoghLevel, v ...interface{})
 	lpf func(level logh.LoghLevel, format string, v ...interface{})
+
+	// initial credentials
+	initialEmail    = "admin"
+	initialPassword = "P@ss!234"
 )
 
 func main() {
@@ -80,14 +85,29 @@ func main() {
 	}
 	lpf(logh.Info, "Config: %s", runtimeConfig)
 
+	privateKeyPath := filepath.Join(appPath, relativePrivateKeyPath)
 	publicKeyPath := filepath.Join(appPath, relativePublicKeyPath)
+	jwtRemovalInterval := time.Minute
+	jwtExpirationInterval := time.Minute * 15
+	// Technically the authJWT.Config could be embedded in the core.Config, but that opens
+	// security holes allowing someone to redirect authentication to a different source.
 	ac := authJWT.Config{
-		AppName:          *runtimeConfig.AppName,
-		JWTPublicKeyPath: publicKeyPath,
-		LogName:          *runtimeConfig.LogName,
+		AppName:                   *runtimeConfig.AppName,
+		AuditLogName:              *runtimeConfig.AuditLogName,
+		DataSourcePath:            filepath.Join(filepath.Dir(*runtimeConfig.DataSourcePath), *runtimeConfig.AppName+authFileSuffix),
+		CreateRequiresAuth:        true,
+		JWTAuthRemoveInterval:     jwtRemovalInterval,
+		JWTAuthExpirationInterval: jwtExpirationInterval,
+		JWTPrivateKeyPath:         privateKeyPath,
+		JWTPublicKeyPath:          publicKeyPath,
+		LogName:                   *runtimeConfig.LogName,
 	}
 	mux := http.NewServeMux()
-	core.OtherInit(&ac, nil, nil)
+	var initialCreds *authJWT.Credential
+	if *runtimeConfig.DataSourceIsNew {
+		initialCreds = &authJWT.Credential{Email: &initialEmail, Password: &initialPassword}
+	}
+	core.OtherInit(&ac, mux, initialCreds)
 
 	// Registering with the trailing slash means the naked path is redirected to this path.
 	path := "/"

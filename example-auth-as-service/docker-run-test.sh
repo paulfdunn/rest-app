@@ -1,8 +1,8 @@
 #!/bin/bash
-# docker-run-test.sh will run the example-standalone app in a docker container, GET
+# docker-run-test.sh will run the example-auth-as-service app in a docker container, GET
 # the root path without the token to show authentication is required, then get a token
 # and GET the root path, resulting in:
-# `hostname: example-standalone, rest-app - from github.com/paulfdunn/rest-app`
+# `hostname: example-auth-as-service, rest-app - from github.com/paulfdunn/rest-app`
 set -x
 
 function exitOnError {
@@ -12,8 +12,8 @@ function exitOnError {
 }
 
 function cleanup {
-docker container stop example-standalone
-docker container rm example-standalone
+docker container stop example-auth-as-service
+docker container rm example-auth-as-service
 }
 
 ME=`basename $0`
@@ -23,8 +23,8 @@ echo -e "\n\ncleanup prior to start"
 cleanup
 
 echo -e "\n\nbuild and run the container"
-docker build -t rest-app/example-standalone:v0.0.0 .
-docker run -p 127.0.0.1:8000:8000/tcp -d --hostname example-standalone --name example-standalone rest-app/example:v0.0.0
+docker build -t rest-app/example-auth-as-service:v0.0.0 .
+docker run -p 127.0.0.1:8000:8000/tcp -d --hostname example-auth-as-service --name example-auth-as-service rest-app/example:v0.0.0
 
 # Give time for the container to start.
 sleep 5

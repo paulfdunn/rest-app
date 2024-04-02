@@ -59,7 +59,7 @@ var (
 
 // flags for CLI
 var (
-	httpsPort   = flag.Int("https-port", 8080, "HTTPS port")
+	httpsPort   = flag.Int("https-port", 8001, "HTTPS port")
 	logFilepath = flag.String("log-filepath", "", "Fully qualified path to log file; default (blank) for STDOUT.")
 	logLevel    = flag.Int("log-level", int(logh.Debug), fmt.Sprintf("Logging level; default %d. Zero based index into: %v",
 		int(logh.Debug), logh.DefaultLevels))

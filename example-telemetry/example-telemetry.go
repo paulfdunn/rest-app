@@ -1,20 +1,19 @@
 // example-telemetry is an example of using github.com/paulfdunn/rest-app (a framework for a GO
 // (GOLANG) based ReST APIs) to create a service that: accepts commands to run, runs those commands
 // and collects STDOUT/STDERR, then allows downloading the resulting data in a ZIP file. This
-// service does not include authentication, but relies on a separate auth service to provide clients
-// with authentication service. This service is then called with a token provisioned from the
-// separate authentication service, and this service validates the token for paths requiring
-// authentication.
+// service does not include authentication natively, but relies on a example-auth-as-service to
+// provide clients with authentication services. This service is then called with a token
+// provisioned from example-auth-as-service, and this service validates the token for paths
+// requiring authentication.
 //
 // See test-example-telemetry.sh for a full working example that uses the API to send an "ls -al"
 // command and download the ZIP file.
 //
-// WARNING - There is no locking on Task objects. Once runner is running, no object updates
-// should occur other than those that occur within runner. I.E. don't update a Task in the
-// foreground while updates are happening in the background (go routine), or the foreground
-// updates will be lost.
+// WARNING - There is no locking on Task objects. Once runner is running, no object updates should
+// occur other than those that occur within runner. I.E. don't update a Task in the foreground while
+// updates are happening in the background (go routine), or the foreground updates will be lost.
 //
-// TODO: REGEX filter to reject unallowed command/shell
+// TODO: REGEX filter to reject/limit values in command/shell
 package main
 
 import (
@@ -61,15 +60,13 @@ type Task struct {
 	Shell []string `json:",omitempty"`
 	// Status is a value of type TaskStatus; output only, do not provide with PUT/POST.
 	Status *TaskStatus `json:",omitempty"`
+	// StatusString is Status.String(). This value should only be used to make output human readable, but
+	// should never be parsed for data processing; use the numeric value as string output is subject to change.
+	// Internally this value is never stored; it is only added to ReST API output as data is returned.
+	StatusString string `json:",omitempty"`
 	// UUID is a UUID that is returned with a task POST
 	UUID *uuid.UUID `json:",omitempty"`
 }
-
-// type StatusDetail struct {
-// 	Done     *bool
-// 	Errors   []error
-// 	Executed *int
-// }
 
 // TaskStatus are the valid states of a Task.Status.
 // These are stored in a database and CANNOT BE REORDERED! Add new values to the end of the list.
@@ -84,12 +81,14 @@ const (
 	Running
 )
 
+// runningTask are used to keep context for running Tasks.
 type runningTask struct {
 	cancelFunc context.CancelFunc
 	ctx        context.Context
 	task       *Task
 }
 
+// runningTaskMap is a map, with Task.Key(), of runningTasks
 type runningTaskMap map[string]runningTask
 
 const (
@@ -98,14 +97,23 @@ const (
 	// relative file paths will be joined with appPath to create the path to the file.
 	relativeCertFilePath  = "/key/rest-app.crt"
 	relativeKeyFilePath   = "/key/rest-app.key"
-	relativePublicKeyPath = "../example-standalone/key/jwt.rsa.public"
+	relativePublicKeyPath = "../example-auth-as-service/key/jwt.rsa.public"
 
 	stderrFileSuffix = ".stderr.txt"
 	stdoutFileSuffix = ".stdout.txt"
 	zipFileSuffix    = ".zip"
 
-	taskKeyCommand = "Command"
-	taskKeyShell   = "Shell"
+	// taskKey values are used for testing and in Task.sliceLength
+	taskKeyCancel         = "Cancel"
+	taskKeyCommand        = "Command"
+	taskKeyErrors         = "Errors"
+	taskKeyExpiration     = "Expiration"
+	taskKeyProcessCommand = "ProcessCommand"
+	taskKeyProcessShell   = "ProcessShell"
+	taskKeyProcessZip     = "ProcessZip"
+	taskKeyShell          = "Shell"
+	taskKeyStatus         = "Status"
+	taskKeyUUID           = "UUID"
 
 	taskDataDirectory   = "taskdata"
 	telemetryFileSuffix = ".db"
@@ -240,13 +248,47 @@ func (tsk *Task) Equal(inputTask *Task, allowedExpirationDifference time.Duratio
 		return false
 	}
 	diff := tskExp.Sub(inputExp).Abs()
-	if tsk.Key() == inputTask.Key() &&
+	if tsk.UUID.String() == inputTask.UUID.String() &&
 		diff <= allowedExpirationDifference &&
+		((tsk.Cancel == nil && inputTask.Cancel == nil) || (*tsk.Cancel == *inputTask.Cancel)) &&
+		((tsk.Status == nil && inputTask.Status == nil) || (*tsk.Status == *inputTask.Status)) &&
 		tsk.sliceLength(taskKeyCommand) == inputTask.sliceLength(taskKeyCommand) &&
+		tsk.sliceLength(taskKeyErrors) == inputTask.sliceLength(taskKeyErrors) &&
+		tsk.sliceLength(taskKeyProcessCommand) == inputTask.sliceLength(taskKeyProcessCommand) &&
+		tsk.sliceLength(taskKeyProcessShell) == inputTask.sliceLength(taskKeyProcessShell) &&
+		tsk.sliceLength(taskKeyProcessZip) == inputTask.sliceLength(taskKeyProcessZip) &&
 		tsk.sliceLength(taskKeyShell) == inputTask.sliceLength(taskKeyShell) {
 		if tsk.sliceLength(taskKeyCommand) > 0 {
 			for i := 0; i < tsk.sliceLength(taskKeyCommand); i++ {
 				if tsk.Command[i] != inputTask.Command[i] {
+					return false
+				}
+			}
+		}
+		if tsk.sliceLength(taskKeyErrors) > 0 {
+			for i := 0; i < tsk.sliceLength(taskKeyErrors); i++ {
+				if tsk.Errors[i] != inputTask.Errors[i] {
+					return false
+				}
+			}
+		}
+		if tsk.sliceLength(taskKeyProcessCommand) > 0 {
+			for i := 0; i < tsk.sliceLength(taskKeyProcessCommand); i++ {
+				if tsk.ProcessCommand[i] != inputTask.ProcessCommand[i] {
+					return false
+				}
+			}
+		}
+		if tsk.sliceLength(taskKeyProcessShell) > 0 {
+			for i := 0; i < tsk.sliceLength(taskKeyProcessShell); i++ {
+				if tsk.ProcessShell[i] != inputTask.ProcessShell[i] {
+					return false
+				}
+			}
+		}
+		if tsk.sliceLength(taskKeyProcessZip) > 0 {
+			for i := 0; i < tsk.sliceLength(taskKeyProcessZip); i++ {
+				if tsk.ProcessZip[i] != inputTask.ProcessZip[i] {
 					return false
 				}
 			}
@@ -299,6 +341,26 @@ func (tsk *Task) sliceLength(field string) int {
 			return -1
 		}
 		return len(tsk.Command)
+	case taskKeyErrors:
+		if tsk.Errors == nil {
+			return -1
+		}
+		return len(tsk.Errors)
+	case taskKeyProcessCommand:
+		if tsk.ProcessCommand == nil {
+			return -1
+		}
+		return len(tsk.ProcessCommand)
+	case taskKeyProcessShell:
+		if tsk.ProcessShell == nil {
+			return -1
+		}
+		return len(tsk.ProcessShell)
+	case taskKeyProcessZip:
+		if tsk.ProcessZip == nil {
+			return -1
+		}
+		return len(tsk.ProcessZip)
 	case taskKeyShell:
 		if tsk.Shell == nil {
 			return -1
@@ -309,7 +371,7 @@ func (tsk *Task) sliceLength(field string) int {
 	return -1
 }
 
-// updateTaskStatus will set the Task.Status to Task.Status
+// updateTaskStatus will Task.Status and serialize the Task to the KVS.
 func (tsk *Task) updateTaskStatus(status TaskStatus) error {
 	stts := status
 	tsk.Status = &stts
@@ -342,7 +404,7 @@ func (rt runningTask) runner() {
 		filepathsShell = rt.runnerExec(false)
 	}
 
-	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), append(filepathsCmd, filepathsShell...))
+	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), append(filepathsCmd, filepathsShell...), false)
 	for {
 		// Task might have been canceled.
 		if *rt.task.Status == Running {

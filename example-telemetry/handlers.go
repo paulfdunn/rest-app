@@ -16,8 +16,7 @@ import (
 	"github.com/paulfdunn/go-helper/neth/httph"
 )
 
-// handlerRoot does nothing - it is just an example of creating a handler and is used by the example
-// script so there is an authenticated endpoint to hit.
+// handlerRoot does nothing other than return application information.
 func handlerRoot(w http.ResponseWriter, r *http.Request) {
 	lpf(logh.Debug, "handlerRoot http.request: %v\n", *r)
 	hostname, err := os.Hostname()
@@ -61,6 +60,7 @@ func handlerStatus(w http.ResponseWriter, r *http.Request) {
 	for i, key := range keys {
 		dtask := Task{}
 		err := telemetryKVS.Deserialize(key, &dtask)
+		dtask.StatusString = dtask.Status.String()
 		if err != nil {
 			lpf(logh.Error, "could not deserialize task: %+v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -86,13 +86,14 @@ func handlerStatus(w http.ResponseWriter, r *http.Request) {
 
 // handlerTask
 // http.MethodDelete - deletes files for Task.UUID; TaskStatus MUST be Canceled, Completed, or Expired.
-// Providing any other fields is invalid. Deleting a task is accomplished with a http.MethodPut with
-// an Expiration date in the past.
+// Use queryParamUUID with a single UUID; more than one UUID is invalid.
+// Deleting a task is accomplished with a http.MethodPut with an Expiration date in the past.
 // http.MethodGet - fetch files for a task for Task.UUID; TaskStatus MUST be Canceled, Completed, or Expired.
-// Providing any other fields is invalid.
-// http.MethodPost - create a new task. It is invalid to supply a UUID or Status in the POST.
+// Use queryParamUUID with a single UUID; more than one UUID is invalid.
+// http.MethodPost - create a new task. It is invalid to any keys other than: Command, Expiration, or Shell.
 // http.MethodPut - with Cancel key 'true' and valid UUID to cancel; providing any other fields or
-// value 'false' will error. (Tasks cannot be un-canceled.)
+// value 'false' will error. (Tasks cannot be un-canceled.) You cannot change fields once posted; delete
+// the task and create a new task.
 func handlerTask(w http.ResponseWriter, r *http.Request) {
 	lpf(logh.Debug, "handlerTask http.request: %v\n", *r)
 
@@ -124,19 +125,15 @@ func handlerTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func taskDelete(w http.ResponseWriter, r *http.Request) {
-	task := Task{}
-	if err := httph.BodyUnmarshal(w, r, &task); err != nil {
-		lpf(logh.Error, "taskDelete error:%v", err)
-		return
-	}
-	if task.Cancel != nil || task.Command != nil || task.Expiration != nil || task.Shell != nil || task.Status != nil ||
-		task.UUID == nil || *task.UUID == uuid.Nil {
+	// The query string is only allowed to have a single UUID
+	query := r.URL.Query()
+	uuids, filterUUID := query[queryParamUUID]
+	if !filterUUID || len(uuids) != 1 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
 	dtask := Task{}
-	err := telemetryKVS.Deserialize(task.Key(), &dtask)
+	err := telemetryKVS.Deserialize(uuids[0], &dtask)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -147,32 +144,27 @@ func taskDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := os.RemoveAll(task.Dir()); err != nil {
-		lpf(logh.Error, "delete data directory %s error:%v", task.Dir(), err)
+	if err := os.RemoveAll(dtask.Dir()); err != nil {
+		lpf(logh.Error, "delete data directory %s error:%v", dtask.Dir(), err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 	if aw, ok := w.(*authJWT.AuditWriter); ok {
-		aw.Message = fmt.Sprintf("delete issued for task with UUID: %s", *task.UUID)
+		aw.Message = fmt.Sprintf("delete issued for task with UUID: %s", *dtask.UUID)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func taskGet(w http.ResponseWriter, r *http.Request) {
-	task := Task{}
-	if err := httph.BodyUnmarshal(w, r, &task); err != nil {
-		lpf(logh.Error, "taskGet error:%v", err)
+	// The query string is only allowed to have a single UUID
+	query := r.URL.Query()
+	uuids, filterUUID := query[queryParamUUID]
+	if !filterUUID || len(uuids) != 1 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if task.Cancel != nil || task.Command != nil || task.Expiration != nil || task.Shell != nil || task.Status != nil ||
-		task.UUID == nil || *task.UUID == uuid.Nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	dtask := Task{}
-	err := telemetryKVS.Deserialize(task.Key(), &dtask)
+	err := telemetryKVS.Deserialize(uuids[0], &dtask)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -183,8 +175,8 @@ func taskGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/x-gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(task.ZipFilePath()))
-	http.ServeFile(w, r, task.ZipFilePath())
+	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(dtask.ZipFilePath()))
+	http.ServeFile(w, r, dtask.ZipFilePath())
 }
 
 func taskPost(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +185,9 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 		lpf(logh.Error, "taskPost error:%v", err)
 		return
 	}
-	if task.Cancel != nil || task.Status != nil || (task.UUID != nil && *task.UUID != uuid.Nil) {
+	if task.Cancel != nil || task.Errors != nil ||
+		task.ProcessCommand != nil || task.ProcessShell != nil || task.ProcessZip != nil ||
+		task.Status != nil || task.UUID != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -234,8 +228,6 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: provide REGEXP validation on Command and Shell.
-
 	// Return the task UUID
 	if aw, ok := w.(*authJWT.AuditWriter); ok {
 		aw.Message = fmt.Sprintf("task create with UUID: %s", *task.UUID)
@@ -275,9 +267,10 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 	}
 	if task.Cancel == nil ||
 		(task.Cancel != nil && *task.Cancel == false) ||
-		(task.Cancel != nil && *task.Cancel == true &&
-			(task.Command != nil || task.Expiration != nil || task.Shell != nil || task.Status != nil ||
-				task.UUID == nil || *task.UUID == uuid.Nil)) {
+		task.Command != nil || task.Expiration != nil || task.Errors != nil ||
+		task.ProcessCommand != nil || task.ProcessShell != nil || task.ProcessZip != nil ||
+		task.Shell != nil || task.Status != nil ||
+		task.UUID == nil || *task.UUID == uuid.Nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -288,7 +281,7 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if dtask.UUID == nil || dtask.Status == nil {
+	if dtask.UUID == nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

@@ -5,8 +5,8 @@ core
 !core/
 example-auth-as-service
 !example-auth-as-service/
-example-standalone
-!example-standalone/
+example-auth-as-service
+!example-auth-as-service/
 example-telemetry
 !example-telemetry/
 *.log.*

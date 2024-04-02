@@ -3,9 +3,11 @@ This is the framework for a GO (GOLANG) based ReST API. This can be used as the 
 
 There are multiple  parts to this repo:
 * github.com/paulfdunn/rest-app/core - Application initialization and configuration. This is provided in a core package to allow leveraging many apps from the same configuration/initialization code. 
-* github.com/paulfdunn/rest-app/example-standalone is provided to show an example of one service, using the core configuration/initialization provided, with authentication running as part of the service.
+* github.com/paulfdunn/rest-app/example-auth-as-service is provided to show an example of using the core configuration/initialization to create an authentication service. This service is designed to be called by other services that have access to the public key of the anthentication service in order to decode the JWT tokens provided by the authentication service.
+    * github.com/paulfdunn/rest-app/example-auth-as-service can also be used as the basis for a standalone service that has JWT based authentication by creating additional endpoint handlers and calling mux.HandleFunc with those functions.
+*  github.com/paulfdunn/rest-app/example-telemetry is another service that uses the core configuration/initialization, but is also uses github.com/paulfdunn/rest-app/example-auth-as-service for authentication. The purpose of example-telemetry is to have a ReST API that allows callers to execute commands, have that output (STDOUT/STDERR) saved to files, then download all output in a ZIP file. (This service is designed for internal use in infrastructure environments, embedded applicaitons, etc. You should never allow anyone to execute arbitrary commands on your servers.)
 
-Key features:
+Key features of rest-app:
 * Leveled logging; provided by github.com/paulfdunn/go-helper/logh 
 * Key/value store (KVS); provided by github.com/paulfdunn/go-helper/databaseh. The KVS is used to store application configuration data and authentication data, but can be used for any other purpose as well.
     * The configuration can be changed dynamically, persisted, and will be re-loaded when the application restarts.
@@ -17,18 +19,16 @@ Key features:
     * Authentication can be embedded in a service, or a standalone service.
 
 ## Usage - standalone service with authentication
-See github.com/paulfdunn/rest-app/example-standalone for a full example and working application that provides a ReST API with JWT authentication.
-* Run test-example-standalone.sh to build/run the example ReST API, authenticate, and issue a command
+See github.com/paulfdunn/rest-app/example-auth-as-service for a full example and working application that provides a ReST API with JWT authentication.
+* Run test-example-auth-as-service.sh to build/run the example ReST API, authenticate, and issue a command
 that passes a token for authentication.
-example-standalone.go
+example-auth-as-service.go
 * Calls ConfigInit to initialize the application configuration.
     * flag.Parse() is called; applicaitons should not call flag.Parse() as flag.Parse() can only be called once per application.
     * Optional - call config.Get() to merge in any saved configuration, which is modified by applications at runtime by calling config.Set().
 * Calls OtherInit to initialize any other provided functionality.
 * Calls blocking function ListenAndServeTLS to start serving your API.
 
-## Usage - authentication as a standalone service, used by one or more independent services 
-See github.com/paulfdunn/rest-app/example-auth-as-a-service for a full example and working application that provides authentication as a service (for use by one or more application services) and an example application service.
-* Run test-example-auth-as-service.sh to build/run the example ReST API, authenticate via the authentication service, then issue a command to the application which validates the provided token.
-* github.com/paulfdunn/rest-app/example-standalone is used to provide authentication, and github.com/paulfdunn/rest-app/example-auth-as-a-service is the application service.
-* In this authentication model, tokens are issues by the authentication service using a relatively short expiration interval, and application services can only validate that a token was valid when issued. Application services cannot verify the user hasn't used the authentication service to log out or invalidate all tokens. Thus keeping a short JWTAuthExpirationInterval, and frequent refresh, is important.
+## Usage - telemetry
+See github.com/paulfdunn/rest-app/example-telemetry. 
+* Run test-example-telemetry.sh to: build and run both the authentication and telemetry services, get a JWT token from the auth service, then make telemetry requests.
