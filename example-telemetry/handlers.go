@@ -185,8 +185,8 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 		lpf(logh.Error, "taskPost error:%v", err)
 		return
 	}
-	if task.Cancel != nil || task.Errors != nil ||
-		task.ProcessCommand != nil || task.ProcessShell != nil || task.ProcessZip != nil ||
+	if task.Cancel != nil || task.ProcessCommand != nil ||
+		task.ProcessError != nil || task.ProcessShell != nil || task.ProcessZip != nil ||
 		task.Status != nil || task.UUID != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -267,8 +267,8 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 	}
 	if task.Cancel == nil ||
 		(task.Cancel != nil && *task.Cancel == false) ||
-		task.Command != nil || task.Expiration != nil || task.Errors != nil ||
-		task.ProcessCommand != nil || task.ProcessShell != nil || task.ProcessZip != nil ||
+		task.Command != nil || task.Expiration != nil || task.File != nil ||
+		task.ProcessCommand != nil || task.ProcessError != nil || task.ProcessShell != nil || task.ProcessZip != nil ||
 		task.Shell != nil || task.Status != nil ||
 		task.UUID == nil || *task.UUID == uuid.Nil {
 		w.WriteHeader(http.StatusBadRequest)

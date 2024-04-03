@@ -94,7 +94,7 @@ func TestTaskEqual(t *testing.T) {
 	t2 = Task{UUID: &uuid1, Cancel: &tr, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	t3 = Task{UUID: &uuid1, Cancel: &fl, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail, UUID and Cancel with value")
+		t.Error("Task.Equal fail, UUID and Cancel")
 	}
 	// test Command
 	sl1 := "some_value"
@@ -103,35 +103,44 @@ func TestTaskEqual(t *testing.T) {
 	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl1}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl2}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail, UUID and Cancel with value")
+		t.Error("Task.Equal fail, UUID and Cancel")
+	}
+	// test File
+	sl1 = "some_value"
+	sl2 = "Some_value"
+	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl1}, Expiration: &exp, File: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl1}, Expiration: &exp, File: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{sl2}, Expiration: &exp, File: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
+	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
+		t.Error("Task.Equal fail, UUID and File")
 	}
 	// test ProcessCommand
 	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{sl1}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{sl1}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{sl2}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail, UUID and ProcessCommand with value")
+		t.Error("Task.Equal fail, UUID and ProcessCommand")
 	}
 	// test ProcessShell
 	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{sl1}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{sl1}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{sl2}, ProcessZip: []string{}, Shell: []string{}, Status: nil}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail, UUID and ProcessShell with value")
+		t.Error("Task.Equal fail, UUID and ProcessShell")
 	}
 	// test ProcessZip
 	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{sl1}, Shell: []string{}, Status: nil}
 	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{sl1}, Shell: []string{}, Status: nil}
 	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{sl2}, Shell: []string{}, Status: nil}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail, UUID and ProcessZip with value")
+		t.Error("Task.Equal fail, UUID and ProcessZip")
 	}
 	// test Shell
 	t1 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{sl1}, Status: nil}
 	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{sl1}, Status: nil}
 	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{sl2}, Status: nil}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail, UUID and Shell with value")
+		t.Error("Task.Equal fail, UUID and Shell")
 	}
 	// test Status
 	accptd := Accepted
@@ -140,7 +149,7 @@ func TestTaskEqual(t *testing.T) {
 	t2 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: &accptd}
 	t3 = Task{UUID: &uuid1, Cancel: nil, Command: []string{}, Expiration: &exp, ProcessCommand: []string{}, ProcessShell: []string{}, ProcessZip: []string{}, Shell: []string{}, Status: &rnng}
 	if !t1.Equal(&t1, durDiff) || !t1.Equal(&t2, durDiff) || t1.Equal(&t3, durDiff) {
-		t.Error("Task.Equal fail, UUID and Status with value")
+		t.Error("Task.Equal fail, UUID and Status")
 	}
 
 	// Validate that allowedExpirationDifference is working properly by testing: the same expiration, a value
@@ -205,7 +214,7 @@ func TestExpectedResponse(t *testing.T) {
 	task5 := Task{UUID: &validUUID}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPost, http.StatusBadRequest, nil, "", &task5})
 	task6 := Task{}
-	// TODO: taskKeyErrors should be in this list but won't unmarshal
+	// TODO: taskKeyProcessError should be in this list but won't unmarshal
 	ik := []string{taskKeyCancel, taskKeyProcessCommand,
 		taskKeyProcessShell, taskKeyProcessZip, taskKeyStatus}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPost, http.StatusBadRequest, ik, "", &task6})
@@ -218,8 +227,8 @@ func TestExpectedResponse(t *testing.T) {
 	task8 := Task{UUID: &validUUID, Cancel: &tr}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPut, http.StatusAccepted, nil, "", &task8})
 	task9 := Task{UUID: &validUUID}
-	// TODO: taskKeyErrors should be in this list but won't unmarshal
-	ik = []string{taskKeyCommand, taskKeyExpiration, taskKeyProcessCommand,
+	// TODO: taskKeyProcessError should be in this list but won't unmarshal
+	ik = []string{taskKeyCommand, taskKeyFile, taskKeyExpiration, taskKeyProcessCommand,
 		taskKeyProcessShell, taskKeyProcessZip, taskKeyShell, taskKeyStatus}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPut, http.StatusBadRequest, ik, "", &task9})
 
@@ -309,7 +318,8 @@ func TestTaskPost(t *testing.T) {
 		}
 
 		// Sleep long enough to make sure the task has been processed by taskRunner
-		time.Sleep(taskRunnerCycleTime * 2)
+		time.Sleep(taskRunnerCycleTime * 5)
+
 		// Add the UUID, Completed Status, and Expiration to the sent task and compare to the deserialized task
 		task.UUID = rtask.UUID
 		sts := Completed
@@ -346,6 +356,9 @@ func TestTaskPostAndDelete(t *testing.T) {
 		return
 	}
 
+	// Sleep long enough to make sure the task has been processed by taskRunner
+	time.Sleep(taskRunnerCycleTime * 5)
+
 	err = telemetryKVS.Deserialize(rtask.Key(), &rtask)
 	if err != nil {
 		t.Errorf("Could not deserialize task: %+v", err)
@@ -381,11 +394,12 @@ func TestTaskPostAndCancel(t *testing.T) {
 		t.Errorf("could not POST task: %+v", err)
 		return
 	}
+
 	// Sleep long enough to make sure the task has been processed by taskRunner
-	time.Sleep(taskRunnerCycleTime * 2)
-	dtask := Task{}
+	time.Sleep(taskRunnerCycleTime * 5)
 
 	// Validate the status is Completed
+	dtask := Task{}
 	err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
 	if err != nil {
 		t.Errorf("Could not deserialize task: %+v", err)
@@ -411,7 +425,7 @@ func TestTaskPostAndCancel(t *testing.T) {
 	}
 
 	// Sleep long enough to make sure the task has been processed by taskRunner
-	time.Sleep(taskRunnerCycleTime * 2)
+	time.Sleep(taskRunnerCycleTime * 5)
 
 	// Validate the status is Canceled
 	err = telemetryKVS.Deserialize(rtask.Key(), &dtask)
@@ -428,8 +442,10 @@ func TestTaskPostAndCancel(t *testing.T) {
 // Post new task, poll status until completed, download file and validate.
 func TestRoundTrip(t *testing.T) {
 	cmd := "ls -alt"
-	expectedFiles := []string{filenameFromCommand(cmd) + stderrFileSuffix, filenameFromCommand(cmd) + stdoutFileSuffix}
-	task := Task{Shell: []string{cmd}}
+	fileTest := "./example-telemetry.go"
+	expectedFiles := []string{filenameFromCommand(cmd) + stderrFileSuffix,
+		filenameFromCommand(cmd) + stdoutFileSuffix, filepath.Base(fileTest)}
+	task := Task{File: []string{fileTest}, Shell: []string{cmd}}
 	rtask, err := testTaskPost(t, task)
 	if err != nil {
 		t.Errorf("could not POST task: %+v", err)
@@ -482,7 +498,7 @@ func TestRoundTrip(t *testing.T) {
 	out.Close()
 
 	// Unzip the returned file and find files of the correct name.
-	_, processedPaths, errs := ziph.AsyncUnzip(outputZipFilepath, t.TempDir(), 2, 0755)
+	_, processedPaths, errs := ziph.AsyncUnzip(outputZipFilepath, t.TempDir(), len(expectedFiles), 0755)
 	pathCount := 0
 	errCount := 0
 	for {
@@ -495,13 +511,15 @@ func TestRoundTrip(t *testing.T) {
 				}
 				lpf(logh.Info, "AsyncUnzip processed path: %s\n", pp)
 			} else {
+				lpf(logh.Info, "AsyncUnzip processedPaths is nil")
 				processedPaths = nil
 			}
 		case err, ok := <-errs:
 			if ok {
 				errCount++
-				lpf(logh.Error, "error: %v\n", err)
+				lpf(logh.Error, "AsyncUnzip error: %v\n", err)
 			} else {
+				lpf(logh.Info, "AsyncUnzip error channel is nil")
 				errs = nil
 			}
 		default:
@@ -510,7 +528,7 @@ func TestRoundTrip(t *testing.T) {
 
 		if noMessage {
 			if processedPaths == nil && errs == nil {
-				lpf(logh.Info, "AsyncZip is done.")
+				lpf(logh.Info, "AsyncUnzip is done.")
 				break
 			}
 			time.Sleep(time.Millisecond)
@@ -552,8 +570,10 @@ func (tsk *Task) setKey(key string, set bool) {
 			tsk.Cancel = &tr
 		case taskKeyCommand:
 			tsk.Command = []string{"nothing"}
-		case taskKeyErrors:
-			tsk.Errors = []error{errors.New("nothing")}
+		case taskKeyFile:
+			tsk.File = []string{"nothing"}
+		case taskKeyProcessError:
+			tsk.ProcessError = []error{errors.New("nothing")}
 		case taskKeyExpiration:
 			exp := time.Now().Add(time.Minute).Format(dateFormat)
 			tsk.Expiration = &exp
@@ -575,8 +595,10 @@ func (tsk *Task) setKey(key string, set bool) {
 			tsk.Cancel = nil
 		case taskKeyCommand:
 			tsk.Command = nil
-		case taskKeyErrors:
-			tsk.Errors = nil
+		case taskKeyFile:
+			tsk.File = nil
+		case taskKeyProcessError:
+			tsk.ProcessError = nil
 		case taskKeyExpiration:
 			tsk.Expiration = nil
 		case taskKeyProcessCommand:

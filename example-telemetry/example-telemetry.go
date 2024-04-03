@@ -1,10 +1,10 @@
 // example-telemetry is an example of using github.com/paulfdunn/rest-app (a framework for a GO
 // (GOLANG) based ReST APIs) to create a service that: accepts commands to run, runs those commands
-// and collects STDOUT/STDERR, then allows downloading the resulting data in a ZIP file. This
-// service does not include authentication natively, but relies on a example-auth-as-service to
-// provide clients with authentication services. This service is then called with a token
-// provisioned from example-auth-as-service, and this service validates the token for paths
-// requiring authentication.
+// and collects STDOUT/STDERR, then allows downloading the resulting data plus additional files in a
+// ZIP file. This service does not include authentication natively, but relies on a
+// example-auth-as-service to provide clients with authentication services. This service is then
+// called with a token provisioned from example-auth-as-service, and this service validates the
+// token for paths requiring authentication.
 //
 // See test-example-telemetry.sh for a full working example that uses the API to send an "ls -al"
 // command and download the ZIP file.
@@ -51,9 +51,11 @@ type Task struct {
 	// defaultExpirationDuration from POST. Upon Expiration a task is Canceled if still running,
 	// and all files are deleted.
 	Expiration *string `json:",omitempty"`
-	// Errors, ProcessCommand, ProcessShell, ProcessZip are status information provided as the task runs.
-	Errors         []error  `json:",omitempty"`
+	// File is a list of files to be collected in returned ZIP file.
+	File []string `json:",omitempty"`
+	// ProcessError, ProcessCommand, ProcessShell, ProcessZip are status information provided as the task runs.
 	ProcessCommand []string `json:",omitempty"`
+	ProcessError   []error  `json:",omitempty"`
 	ProcessShell   []string `json:",omitempty"`
 	ProcessZip     []string `json:",omitempty"`
 	// Shell is a slice of strings of commands that are executed in a shell.
@@ -106,7 +108,8 @@ const (
 	// taskKey values are used for testing and in Task.sliceLength
 	taskKeyCancel         = "Cancel"
 	taskKeyCommand        = "Command"
-	taskKeyErrors         = "Errors"
+	taskKeyFile           = "File"
+	taskKeyProcessError   = "ProcessError"
 	taskKeyExpiration     = "Expiration"
 	taskKeyProcessCommand = "ProcessCommand"
 	taskKeyProcessShell   = "ProcessShell"
@@ -253,7 +256,8 @@ func (tsk *Task) Equal(inputTask *Task, allowedExpirationDifference time.Duratio
 		((tsk.Cancel == nil && inputTask.Cancel == nil) || (*tsk.Cancel == *inputTask.Cancel)) &&
 		((tsk.Status == nil && inputTask.Status == nil) || (*tsk.Status == *inputTask.Status)) &&
 		tsk.sliceLength(taskKeyCommand) == inputTask.sliceLength(taskKeyCommand) &&
-		tsk.sliceLength(taskKeyErrors) == inputTask.sliceLength(taskKeyErrors) &&
+		tsk.sliceLength(taskKeyFile) == inputTask.sliceLength(taskKeyFile) &&
+		tsk.sliceLength(taskKeyProcessError) == inputTask.sliceLength(taskKeyProcessError) &&
 		tsk.sliceLength(taskKeyProcessCommand) == inputTask.sliceLength(taskKeyProcessCommand) &&
 		tsk.sliceLength(taskKeyProcessShell) == inputTask.sliceLength(taskKeyProcessShell) &&
 		tsk.sliceLength(taskKeyProcessZip) == inputTask.sliceLength(taskKeyProcessZip) &&
@@ -265,9 +269,9 @@ func (tsk *Task) Equal(inputTask *Task, allowedExpirationDifference time.Duratio
 				}
 			}
 		}
-		if tsk.sliceLength(taskKeyErrors) > 0 {
-			for i := 0; i < tsk.sliceLength(taskKeyErrors); i++ {
-				if tsk.Errors[i] != inputTask.Errors[i] {
+		if tsk.sliceLength(taskKeyProcessError) > 0 {
+			for i := 0; i < tsk.sliceLength(taskKeyProcessError); i++ {
+				if tsk.ProcessError[i] != inputTask.ProcessError[i] {
 					return false
 				}
 			}
@@ -341,11 +345,16 @@ func (tsk *Task) sliceLength(field string) int {
 			return -1
 		}
 		return len(tsk.Command)
-	case taskKeyErrors:
-		if tsk.Errors == nil {
+	case taskKeyFile:
+		if tsk.File == nil {
 			return -1
 		}
-		return len(tsk.Errors)
+		return len(tsk.Command)
+	case taskKeyProcessError:
+		if tsk.ProcessError == nil {
+			return -1
+		}
+		return len(tsk.ProcessError)
 	case taskKeyProcessCommand:
 		if tsk.ProcessCommand == nil {
 			return -1
@@ -409,7 +418,11 @@ func (rt runningTask) runner() {
 	if err != nil {
 		lpf(logh.Error, "filepath.Abs: %+v", err)
 	}
-	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), append(filepathsCmd, filepathsShell...), &trim)
+	zipFiles := make([]string, 0, len(filepathsCmd)+len(filepathsShell)+len(rt.task.File))
+	zipFiles = append(zipFiles, filepathsCmd...)
+	zipFiles = append(zipFiles, filepathsShell...)
+	zipFiles = append(zipFiles, rt.task.File...)
+	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), zipFiles, &trim)
 	for {
 		// Task might have been canceled.
 		if *rt.task.Status != Running {
@@ -427,7 +440,7 @@ func (rt runningTask) runner() {
 		case err, ok := <-errs:
 			if ok {
 				lpf(logh.Info, "AsyncZip error: %v\n", err)
-				rt.task.Errors = append(rt.task.Errors, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, err)
 			} else {
 				errs = nil
 			}
@@ -492,13 +505,13 @@ func (rt runningTask) runnerExec(command bool) []string {
 			stderr, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stderrFileSuffix))
 			if err != nil {
 				lpf(logh.Error, "os.Create: %+v", err)
-				rt.task.Errors = append(rt.task.Errors, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, err)
 			}
 			defer stderr.Close()
 			stdout, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stdoutFileSuffix))
 			if err != nil {
 				lpf(logh.Error, "os.Create: %+v", err)
-				rt.task.Errors = append(rt.task.Errors, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, err)
 			}
 			defer stdout.Close()
 			filepaths = append(filepaths, stderr.Name(), stdout.Name())
@@ -516,7 +529,7 @@ func (rt runningTask) runnerExec(command bool) []string {
 				lpf(logh.Error, "non-zero return code %d for command: %t, cmdAndArgs: %s", rc, command, cmdAndArgs)
 			}
 			if err != nil {
-				rt.task.Errors = append(rt.task.Errors, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, err)
 			}
 
 			// Save status information.
