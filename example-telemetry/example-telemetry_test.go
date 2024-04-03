@@ -310,7 +310,7 @@ func TestTaskPost(t *testing.T) {
 
 		// Sleep long enough to make sure the task has been processed by taskRunner
 		time.Sleep(taskRunnerCycleTime * 2)
-		// Add the UUID, Accepted Status, and Expiration to the sent task and compare to the deserialized task
+		// Add the UUID, Completed Status, and Expiration to the sent task and compare to the deserialized task
 		task.UUID = rtask.UUID
 		sts := Completed
 		task.Status = &sts
@@ -326,6 +326,7 @@ func TestTaskPost(t *testing.T) {
 			t.Errorf("Could not deserialize task: %+v", err)
 			return
 		}
+		dtask.ProcessZip = nil
 		if !dtask.Equal(&task, time.Second*20) {
 			t.Errorf("Sent and deserialized tasks are not equal, \ntask: %+v, \ndtask: %+v", task, dtask)
 			return

@@ -404,10 +404,15 @@ func (rt runningTask) runner() {
 		filepathsShell = rt.runnerExec(false)
 	}
 
-	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), append(filepathsCmd, filepathsShell...), false)
+	// Task.Dir may be relative, make it absolute for trimming.
+	trim, err := filepath.Abs(rt.task.Dir())
+	if err != nil {
+		lpf(logh.Error, "filepath.Abs: %+v", err)
+	}
+	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), append(filepathsCmd, filepathsShell...), &trim)
 	for {
 		// Task might have been canceled.
-		if *rt.task.Status == Running {
+		if *rt.task.Status != Running {
 			break
 		}
 		noMessage := false

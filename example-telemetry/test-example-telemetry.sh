@@ -45,7 +45,7 @@ if [[ $? != 0 ]]; then
     exit
 fi
 # Run the apps in the background.
-../example-auth-as-service/example-auth-as-service  -https-port=8000 -log-level=0 -log-filepath=./example-auth-as-service.log  -persistent-directory=./&
+../example-auth-as-service/example-auth-as-service  -https-port=8000 -log-level=0 -log-filepath=./example-auth-as-service.log  -persistent-directory=./ &
 ./example-telemetry  -https-port=8001 -log-level=0 -log-filepath=./example-telemetry.log -persistent-directory=./ &
 # Wait for apps to start.
 sleep 5
