@@ -51,7 +51,8 @@ type Task struct {
 	// defaultExpirationDuration from POST. Upon Expiration a task is Canceled if still running,
 	// and all files are deleted.
 	Expiration *string `json:",omitempty"`
-	// File is a list of files to be collected in returned ZIP file.
+	// File is a list of files and directories to be collected in returned ZIP file. Globs and wildcards
+	// are not supported.
 	File []string `json:",omitempty"`
 	// ProcessError, ProcessCommand, ProcessShell, ProcessZip are status information provided as the task runs.
 	ProcessCommand []string `json:",omitempty"`
@@ -422,7 +423,7 @@ func (rt runningTask) runner() {
 	zipFiles = append(zipFiles, filepathsCmd...)
 	zipFiles = append(zipFiles, filepathsShell...)
 	zipFiles = append(zipFiles, rt.task.File...)
-	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), zipFiles, &trim)
+	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), zipFiles, []string{trim})
 	for {
 		// Task might have been canceled.
 		if *rt.task.Status != Running {
