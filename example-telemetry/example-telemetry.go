@@ -327,16 +327,6 @@ func (tsk Task) ZipFilePath() string {
 	return filepath.Join(tsk.Dir(), tsk.UUID.String()+zipFileSuffix)
 }
 
-// serialize stores a task in the KVS
-func (tsk *Task) serialize() error {
-	err := telemetryKVS.Serialize(tsk.Key(), tsk)
-	if err != nil {
-		lpf(logh.Error, "Serialize task: %+v", err)
-		return err
-	}
-	return nil
-}
-
 // SliceLength is used to get the length of one of the slice fields. This main utility of this function
 // is for Equal(ality) testing.
 func (tsk *Task) sliceLength(field string) int {
@@ -456,7 +446,9 @@ func (rt runningTask) runner() {
 			}
 
 			// Save status information.
-			telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+			if err := telemetryKVS.Serialize(rt.task.Key(), &rt.task); err != nil {
+				lpf(logh.Error, "telemetryKVS.Serialize error: %+v", err)
+			}
 
 			time.Sleep(time.Second)
 		}
@@ -468,7 +460,9 @@ func (rt runningTask) runner() {
 		cmplt := Completed
 		rt.task.Status = &cmplt
 	}
-	telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+	if err := telemetryKVS.Serialize(rt.task.Key(), &rt.task); err != nil {
+		lpf(logh.Error, "telemetryKVS.Serialize error: %+v", err)
+	}
 
 	lpf(logh.Info, "task %s completed", rt.task.UUID.String())
 	taskCompleted <- rt.task.Key()
@@ -484,13 +478,15 @@ func (rt runningTask) runnerExec(command bool) []string {
 	}
 	// Each command generates 2 files; stdout and stderr
 	filepaths := make([]string, 0, len(execList)*2)
-	if execList != nil && len(execList) > 0 {
+	if len(execList) > 0 {
 		for _, cmdAndArgs := range execList {
 			select {
 			case <-rt.ctx.Done():
 				cncl := Canceled
 				rt.task.Status = &cncl
-				telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+				if err := telemetryKVS.Serialize(rt.task.Key(), &rt.task); err != nil {
+					lpf(logh.Error, "telemetryKVS.Serialize error: %+v", err)
+				}
 				// return rt.ctx.Err()
 				return filepaths
 			default:
@@ -534,7 +530,9 @@ func (rt runningTask) runnerExec(command bool) []string {
 			}
 
 			// Save status information.
-			telemetryKVS.Serialize(rt.task.Key(), &rt.task)
+			if err := telemetryKVS.Serialize(rt.task.Key(), &rt.task); err != nil {
+				lpf(logh.Error, "telemetryKVS.Serialize error: %+v", err)
+			}
 		}
 	}
 	return filepaths
@@ -575,8 +573,7 @@ func (rtm runningTaskMap) scheduleTasks() {
 			}
 			lpf(logh.Info, "ScheduleTasks accepting task %s", key)
 			ctx, cancelFunc := context.WithCancel(context.Background())
-			err = dtask.updateTaskStatus(Running)
-			if err != nil {
+			if err = dtask.updateTaskStatus(Running); err != nil {
 				lpf(logh.Error, "updateTaskStatus: %+v", err)
 			}
 			rt := runningTask{cancelFunc: cancelFunc, ctx: ctx, task: &dtask}
@@ -613,8 +610,7 @@ func deleteExpiredTasks() {
 			if err := os.RemoveAll(dtask.Dir()); err != nil {
 				lpf(logh.Error, "delete data directory %s error:%v", dtask.Dir(), err)
 			}
-			err := dtask.updateTaskStatus(Canceled)
-			if err != nil {
+			if err = dtask.updateTaskStatus(Canceled); err != nil {
 				lpf(logh.Error, "updateTaskStatus: %+v", err)
 			}
 		}
@@ -684,7 +680,9 @@ func taskRunner() {
 				if err != nil {
 					log.Fatalf("Deserialize task: %+v", err)
 				}
-				dtask.updateTaskStatus(Canceled)
+				if err = dtask.updateTaskStatus(Canceled); err != nil {
+					lpf(logh.Error, "updateTaskStatus: %+v", err)
+				}
 				lpf(logh.Warning, "taskRunner received non-running task %s to cancel", key)
 			}
 			// Allow cancelation requests to short circuit the loop as they may be done programatically

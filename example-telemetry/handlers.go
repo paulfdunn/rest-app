@@ -81,7 +81,9 @@ func handlerStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(b)
+	if _, err = w.Write(b); err != nil {
+		lpf(logh.Error, "w.Write error:%v", err)
+	}
 }
 
 // handlerTask
@@ -214,9 +216,11 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 
 	// Create the directory used to hold output data for the task
 	if _, err := os.Stat(task.Dir()); os.IsNotExist(err) {
-		os.MkdirAll(task.Dir(), 0755)
+		if err := os.MkdirAll(task.Dir(), 0755); err != nil {
+			lpf(logh.Error, "could not create directory: %s, error: %+v", task.Dir(), err)
+		}
 	} else {
-		lpf(logh.Error, "could not create directory: %s, error: %+v", task.Dir(), err)
+		lpf(logh.Error, "could not get directory stats: %s, error: %+v", task.Dir(), err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -236,9 +240,11 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 	rtask := Task{UUID: task.UUID}
 	b, err := json.Marshal(rtask)
 	if err != nil {
-		// Attempt to delete the task, since the client gets an error.
-		telemetryKVS.Delete(task.Key())
 		lpf(logh.Error, "json.Marshal error:%v", err)
+		// Attempt to delete the task, since the client gets an error.
+		if _, err := telemetryKVS.Delete(task.Key()); err != nil {
+			lpf(logh.Error, "telemetryKVS.Delete error:%v", err)
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -256,7 +262,9 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", path.Join(pathStatus, task.Key()))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write(b)
+	if _, err = w.Write(b); err != nil {
+		lpf(logh.Error, "w.Write error:%v", err)
+	}
 }
 
 func taskPut(w http.ResponseWriter, r *http.Request) {
@@ -266,7 +274,7 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if task.Cancel == nil ||
-		(task.Cancel != nil && *task.Cancel == false) ||
+		(task.Cancel != nil && !*task.Cancel) ||
 		task.Command != nil || task.Expiration != nil || task.File != nil ||
 		task.ProcessCommand != nil || task.ProcessError != nil || task.ProcessShell != nil || task.ProcessZip != nil ||
 		task.Shell != nil || task.Status != nil ||

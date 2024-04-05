@@ -190,8 +190,7 @@ func TestExpectedResponse(t *testing.T) {
 		st := i
 		// Serialize a task with status, but Status must be empty for the request.
 		stask := Task{Status: &st, UUID: &vu}
-		telemetryKVS.Serialize(stask.Key(), stask)
-		if err != nil {
+		if err := telemetryKVS.Serialize(stask.Key(), stask); err != nil {
 			t.Errorf("Serialize error: %+v", err)
 		}
 		var expectedStatus int
@@ -254,7 +253,9 @@ func TestStatus(t *testing.T) {
 	testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
 	defer testServerStatus.Close()
 
-	clearTelemetryKVS(t)
+	if err := clearTelemetryKVS(t); err != nil {
+		t.Errorf("clearTelemetryKVS error:%+v", err)
+	}
 
 	// Make some tasks for testing and POST them
 	tasks := make([]*Task, 4)
@@ -269,7 +270,9 @@ func TestStatus(t *testing.T) {
 	}
 
 	rtasks := []Task{}
-	getAndUnmarshal(t, testServerStatus.URL, &rtasks)
+	if err := getAndUnmarshal(t, testServerStatus.URL, &rtasks); err != nil {
+		t.Errorf("getAndUnmarshal error: %+v", err)
+	}
 
 	if len(rtasks) != len(tasks) {
 		t.Errorf("status returned incorrect data")
@@ -284,7 +287,9 @@ func TestStatus(t *testing.T) {
 		query := "/?" + strings.Join(queries, "&")
 
 		rtasks = []Task{}
-		getAndUnmarshal(t, testServerStatus.URL+query, &rtasks)
+		if err := getAndUnmarshal(t, testServerStatus.URL+query, &rtasks); err != nil {
+			t.Errorf("getAndUnmarshal error: %+v", err)
+		}
 
 		if len(rtasks) != i+1 {
 			t.Errorf("status returned incorrect data")
@@ -461,7 +466,9 @@ func TestRoundTrip(t *testing.T) {
 		query := "/?" + fmt.Sprintf("%s=%s", queryParamUUID, rtask.Key())
 
 		stasks := []Task{}
-		getAndUnmarshal(t, testServerStatus.URL+query, &stasks)
+		if err := getAndUnmarshal(t, testServerStatus.URL+query, &stasks); err != nil {
+			t.Errorf("getAndUnmarshal error: %+v", err)
+		}
 
 		if len(stasks) != 1 {
 			t.Errorf("status returned incorrect data")
