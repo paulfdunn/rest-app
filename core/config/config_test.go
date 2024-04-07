@@ -17,7 +17,9 @@ func init() {
 }
 
 func TestSetGetDelete(t *testing.T) {
-	testSetup()
+	if err := testSetup(); err != nil {
+		t.Errorf("testSetup error: %+v", err)
+	}
 
 	initializeKVInstance(dataSourcePath)
 	value, err := configKVS.Get(configKey)
@@ -72,7 +74,9 @@ func TestSetGetDelete(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	testSetup()
+	if err := testSetup(); err != nil {
+		t.Errorf("testSetup error: %+v", err)
+	}
 
 	// Test dataSourcePath delete
 	if _, err := os.Create(dataSourcePath); err != nil {
@@ -139,6 +143,6 @@ func TestReset(t *testing.T) {
 	// Init("test", dataSourcePath, 1, 1000, 1, 1000, []string{killFile})
 }
 
-func testSetup() {
-	resetIfRequested(true, dataSourcePath, []string{})
+func testSetup() error {
+	return resetIfRequested(true, dataSourcePath, []string{})
 }
