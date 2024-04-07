@@ -75,7 +75,9 @@ func TestReset(t *testing.T) {
 	testSetup()
 
 	// Test dataSourcePath delete
-	os.Create(dataSourcePath)
+	if _, err := os.Create(dataSourcePath); err != nil {
+		t.Errorf("os.Create error:%+v", err)
+	}
 	if _, err := os.Stat(dataSourcePath); os.IsNotExist(err) {
 		t.Error("test delete db was not created")
 		return
@@ -84,7 +86,9 @@ func TestReset(t *testing.T) {
 	// Test the filepathsToDeleteOnReset
 	killFileBase := filepath.Join(t.TempDir(), "kill")
 	killFile := killFileBase + ".me"
-	os.Create(killFile)
+	if _, err := os.Create(killFile); err != nil {
+		t.Errorf("os.Create error:%+v", err)
+	}
 	if _, err := os.Stat(killFile); os.IsNotExist(err) {
 		t.Error("test delete file was not created")
 		return
@@ -95,8 +99,12 @@ func TestReset(t *testing.T) {
 	logFilepath = &lfp
 	lfp0 := *logFilepath + ".0"
 	lfp1 := *logFilepath + ".1"
-	os.Create(lfp0)
-	os.Create(lfp1)
+	if _, err := os.Create(lfp0); err != nil {
+		t.Errorf("os.Create error:%+v", err)
+	}
+	if _, err := os.Create(lfp1); err != nil {
+		t.Errorf("os.Create error:%+v", err)
+	}
 	if _, err := os.Stat(lfp0); os.IsNotExist(err) {
 		t.Error("test log.0 file was not created")
 		return
