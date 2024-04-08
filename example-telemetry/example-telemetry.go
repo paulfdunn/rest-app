@@ -504,13 +504,21 @@ func (rt runningTask) runnerExec(command bool) []string {
 				lpf(logh.Error, "os.Create: %+v", err)
 				rt.task.ProcessError = append(rt.task.ProcessError, err)
 			}
-			defer stderr.Close()
+			defer func() {
+				if err := stderr.Close(); err != nil {
+					fmt.Printf("stderr.Close() error:%+v\n", err)
+				}
+			}()
 			stdout, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stdoutFileSuffix))
 			if err != nil {
 				lpf(logh.Error, "os.Create: %+v", err)
 				rt.task.ProcessError = append(rt.task.ProcessError, err)
 			}
-			defer stdout.Close()
+			defer func() {
+				if err := stdout.Close(); err != nil {
+					fmt.Printf("stdout.Close() error:%+v\n", err)
+				}
+			}()
 			filepaths = append(filepaths, stderr.Name(), stdout.Name())
 
 			ea := exech.ExecArgs{Args: args, Command: cmdSplit[0], Context: rt.ctx, Stderr: stderr, Stdout: stdout}

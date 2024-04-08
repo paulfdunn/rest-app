@@ -171,7 +171,10 @@ func (cnfg *Config) Set() error {
 }
 
 func (cnfg Config) String() string {
-	b, _ := json.Marshal(cnfg)
+	b, err := json.Marshal(cnfg)
+	if err != nil {
+		logh.Map[*cnfg.LogName].Printf(logh.Error, "json.Marshal() error:%+v", err)
+	}
 	return string(b)
 }
 
