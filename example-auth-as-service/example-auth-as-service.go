@@ -1,6 +1,6 @@
 // example-auth-as-service is an example of using github.com/paulfdunn/rest-app (a framework for a
 // GO (GOLANG) based ReST APIs) to create a standalone application that
-// uses github.com/paulfdunn/authJWT for authentication.
+// uses github.com/paulfdunn/authjwt for authentication.
 // This application includes the authentication directly in the service.
 package main
 
@@ -13,7 +13,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/paulfdunn/authJWT"
+	"github.com/paulfdunn/authjwt"
 	"github.com/paulfdunn/go-helper/logh"
 	"github.com/paulfdunn/go-helper/osh/runtimeh"
 	"github.com/paulfdunn/rest-app/core"
@@ -89,9 +89,9 @@ func main() {
 	publicKeyPath := filepath.Join(appPath, relativePublicKeyPath)
 	jwtRemovalInterval := time.Minute
 	jwtExpirationInterval := time.Minute * 15
-	// Technically the authJWT.Config could be embedded in the core.Config, but that opens
+	// Technically the authjwt.Config could be embedded in the core.Config, but that opens
 	// security holes allowing someone to redirect authentication to a different source.
-	ac := authJWT.Config{
+	ac := authjwt.Config{
 		AppName:                   *runtimeConfig.AppName,
 		AuditLogName:              *runtimeConfig.AuditLogName,
 		DataSourcePath:            filepath.Join(filepath.Dir(*runtimeConfig.DataSourcePath), *runtimeConfig.AppName+authFileSuffix),
@@ -103,15 +103,15 @@ func main() {
 		LogName:                   *runtimeConfig.LogName,
 	}
 	mux := http.NewServeMux()
-	var initialCreds *authJWT.Credential
+	var initialCreds *authjwt.Credential
 	if *runtimeConfig.DataSourceIsNew {
-		initialCreds = &authJWT.Credential{Email: &initialEmail, Password: &initialPassword}
+		initialCreds = &authjwt.Credential{Email: &initialEmail, Password: &initialPassword}
 	}
 	core.OtherInit(&ac, mux, initialCreds)
 
 	// Registering with the trailing slash means the naked path is redirected to this path.
 	path := "/"
-	mux.HandleFunc(path, authJWT.HandlerFuncAuthJWTWrapper(handler))
+	mux.HandleFunc(path, authjwt.HandlerFuncAuthJWTWrapper(handler))
 	lpf(logh.Info, "Registered handler: %s\n", path)
 
 	cfp := filepath.Join(appPath, relativeCertFilePath)

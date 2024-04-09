@@ -31,7 +31,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/paulfdunn/authJWT"
+	"github.com/paulfdunn/authjwt"
 	"github.com/paulfdunn/go-helper/archiveh/ziph"
 	"github.com/paulfdunn/go-helper/databaseh/kvs"
 	"github.com/paulfdunn/go-helper/logh"
@@ -205,7 +205,7 @@ func main() {
 	lpf(logh.Info, "Config: %s", runtimeConfig)
 
 	publicKeyPath := filepath.Join(appPath, relativePublicKeyPath)
-	ac := authJWT.Config{
+	ac := authjwt.Config{
 		AppName:          *runtimeConfig.AppName,
 		JWTPublicKeyPath: publicKeyPath,
 		LogName:          *runtimeConfig.LogName,
@@ -216,11 +216,11 @@ func main() {
 	initializeKVS(filepath.Dir(*runtimeConfig.DataSourcePath), *runtimeConfig.AppName+telemetryFileSuffix)
 
 	path := "/"
-	mux.HandleFunc(path, authJWT.HandlerFuncAuthJWTWrapper(handlerRoot))
+	mux.HandleFunc(path, authjwt.HandlerFuncAuthJWTWrapper(handlerRoot))
 	lpf(logh.Info, "Registered handler: %s\n", path)
-	mux.HandleFunc(pathStatus, authJWT.HandlerFuncAuthJWTWrapper(handlerStatus))
+	mux.HandleFunc(pathStatus, authjwt.HandlerFuncAuthJWTWrapper(handlerStatus))
 	lpf(logh.Info, "Registered handler: %s\n", pathStatus)
-	mux.HandleFunc(pathTask, authJWT.HandlerFuncAuthJWTWrapper(handlerTask))
+	mux.HandleFunc(pathTask, authjwt.HandlerFuncAuthJWTWrapper(handlerTask))
 	lpf(logh.Info, "Registered handler: %s\n", pathTask)
 
 	deleteExpiredTasks()

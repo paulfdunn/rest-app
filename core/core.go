@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/paulfdunn/authJWT"
+	"github.com/paulfdunn/authjwt"
 	"github.com/paulfdunn/go-helper/logh"
 	"github.com/paulfdunn/go-helper/osh/runtimeh"
 	"github.com/paulfdunn/rest-app/core/config"
@@ -31,9 +31,9 @@ func ConfigInit(cnfg config.Config, filepathsToDeleteOnReset []string) {
 }
 
 // OtherInit calls all required Init functions. Note that authentication is entirely optional.
-func OtherInit(authConfig *authJWT.Config, mux *http.ServeMux, initialCred *authJWT.Credential) {
+func OtherInit(authConfig *authjwt.Config, mux *http.ServeMux, initialCred *authjwt.Credential) {
 	if authConfig != nil {
-		authJWT.Init(*authConfig, mux)
+		authjwt.Init(*authConfig, mux)
 	}
 
 	if initialCred != nil {

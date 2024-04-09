@@ -1,8 +1,7 @@
 go 1.21.8
 
 use (
-	.
-	./core
-	./example-auth-as-service
-	./example-telemetry
+    ./core
+    ./example-auth-as-service
+    ./example-telemetry
 )

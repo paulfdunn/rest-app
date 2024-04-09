@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/paulfdunn/authJWT"
+	"github.com/paulfdunn/authjwt"
 	"github.com/paulfdunn/go-helper/logh"
 	"github.com/paulfdunn/go-helper/neth/httph"
 )
@@ -151,7 +151,7 @@ func taskDelete(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	if aw, ok := w.(*authJWT.AuditWriter); ok {
+	if aw, ok := w.(*authjwt.AuditWriter); ok {
 		aw.Message = fmt.Sprintf("delete issued for task with UUID: %s", *dtask.UUID)
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -233,7 +233,7 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the task UUID
-	if aw, ok := w.(*authJWT.AuditWriter); ok {
+	if aw, ok := w.(*authjwt.AuditWriter); ok {
 		aw.Message = fmt.Sprintf("task create with UUID: %s", *task.UUID)
 	}
 	// Return a Task with only a UUID
@@ -302,7 +302,7 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 	}
 	taskCancel <- task.Key()
 
-	if aw, ok := w.(*authJWT.AuditWriter); ok {
+	if aw, ok := w.(*authjwt.AuditWriter); ok {
 		aw.Message = fmt.Sprintf("task status changed to %s with UUID: %s", Canceling, *task.UUID)
 	}
 	w.WriteHeader(http.StatusAccepted)
