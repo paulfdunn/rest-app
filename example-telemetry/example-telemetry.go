@@ -35,6 +35,7 @@ import (
 	"github.com/paulfdunn/go-helper/archiveh/ziph"
 	"github.com/paulfdunn/go-helper/databaseh/kvs"
 	"github.com/paulfdunn/go-helper/logh"
+	"github.com/paulfdunn/go-helper/osh"
 	"github.com/paulfdunn/go-helper/osh/exech"
 	"github.com/paulfdunn/go-helper/osh/runtimeh"
 	"github.com/paulfdunn/rest-app/core"
@@ -54,6 +55,9 @@ type Task struct {
 	// File is a list of files and directories to be collected in returned ZIP file. Globs and wildcards
 	// are not supported.
 	File []string `json:",omitempty"`
+	// The File slice is filtered to only included files with a modified time within the last
+	// FileModifiedSeconds. Default is no filtering based on file modified time.
+	FileModifiedSeconds *int `json:",omitempty"`
 	// ProcessError, ProcessCommand, ProcessShell, ProcessZip are status information provided as the task runs.
 	ProcessCommand []string `json:",omitempty"`
 	ProcessError   []error  `json:",omitempty"`
@@ -391,7 +395,7 @@ func (ts TaskStatus) String() string {
 
 // runner does the work for a runningTask; it should be called in a Go routine from ScheduleTasks.
 // The work to do: execute all commands in task.Command, and task.Shell, and create the zip
-// file. Status is updates as it runs.
+// file. Status is updated as it runs.
 // WARNING - There is no locking on Task objects. Once runner is running, no object updates
 // should occur other than those that occur within runner. I.E. don't update a Task in the
 // foreground while updates are happening in the background (go routine), or the foreground
@@ -412,7 +416,15 @@ func (rt runningTask) runner() {
 	zipFiles := make([]string, 0, len(filepathsCmd)+len(filepathsShell)+len(rt.task.File))
 	zipFiles = append(zipFiles, filepathsCmd...)
 	zipFiles = append(zipFiles, filepathsShell...)
-	zipFiles = append(zipFiles, rt.task.File...)
+	if rt.task.FileModifiedSeconds != nil {
+		filteredFiles, err := osh.FileModifiedAfterFilter(rt.task.File, *rt.task.FileModifiedSeconds)
+		if err != nil {
+			lpf(logh.Error, "FileModifiedFilter error:%+v", err)
+		}
+		zipFiles = append(zipFiles, filteredFiles...)
+	} else {
+		zipFiles = append(zipFiles, rt.task.File...)
+	}
 	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), zipFiles, []string{trim})
 	for {
 		// Task might have been canceled.

@@ -445,104 +445,117 @@ func TestTaskPostAndCancel(t *testing.T) {
 }
 
 // Post new task, poll status until completed, download file and validate.
+// Test twice: loop 0 tests no FileModifiedSeconds, loop 1 tests FileModifiedSeconds
+// with a short value to filter out the test file.
 func TestRoundTrip(t *testing.T) {
-	cmd := "ls -alt"
-	fileTest := "./example-telemetry.go"
-	expectedFiles := []string{filenameFromCommand(cmd) + stderrFileSuffix,
-		filenameFromCommand(cmd) + stdoutFileSuffix, filepath.Base(fileTest)}
-	task := Task{File: []string{fileTest}, Shell: []string{cmd}}
-	rtask, err := testTaskPost(t, task)
-	if err != nil {
-		t.Errorf("could not POST task: %+v", err)
-		return
-	}
-	testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
-	defer testServerStatus.Close()
-	testServerTask := httptest.NewServer(http.HandlerFunc(handlerTask))
-	defer testServerTask.Close()
-
-	// Use query strings to ask for task and wait until done.
-	for {
-		query := "/?" + fmt.Sprintf("%s=%s", queryParamUUID, rtask.Key())
-
-		stasks := []Task{}
-		if err := getAndUnmarshal(t, testServerStatus.URL+query, &stasks); err != nil {
-			t.Errorf("getAndUnmarshal error: %+v", err)
+	fms := 1
+	fileModifiedSeconds := []*int{nil, &fms}
+	for i := 0; i <= 1; i++ {
+		cmd := "ls -alt"
+		fileTest := "./example-telemetry.go"
+		var expectedFiles []string
+		switch i {
+		case 0:
+			expectedFiles = []string{filenameFromCommand(cmd) + stderrFileSuffix,
+				filenameFromCommand(cmd) + stdoutFileSuffix, filepath.Base(fileTest)}
+		case 1:
+			expectedFiles = []string{filenameFromCommand(cmd) + stderrFileSuffix,
+				filenameFromCommand(cmd) + stdoutFileSuffix}
 		}
-
-		if len(stasks) != 1 {
-			t.Errorf("status returned incorrect data")
+		task := Task{File: []string{fileTest}, Shell: []string{cmd}, FileModifiedSeconds: fileModifiedSeconds[i]}
+		rtask, err := testTaskPost(t, task)
+		if err != nil {
+			t.Errorf("could not POST task: %+v", err)
+			return
 		}
-		if stasks[0].Status != nil && *stasks[0].Status == Completed {
-			break
-		}
-	}
+		testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
+		defer testServerStatus.Close()
+		testServerTask := httptest.NewServer(http.HandlerFunc(handlerTask))
+		defer testServerTask.Close()
 
-	// Get the zip file
-	outputZipFilepath := filepath.Join(t.TempDir(), "test.zip")
-	out, err := os.Create(outputZipFilepath)
-	if err != nil {
-		t.Errorf("file create: %+v", err)
-	}
-	defer out.Close()
-	client := &http.Client{}
-	query := fmt.Sprintf(`?uuid=%s`, rtask.UUID.String())
-	req, err := http.NewRequest(http.MethodGet, testServerTask.URL+query, nil)
-	if err != nil {
-		t.Errorf("NewRequest error: %v", err)
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		t.Errorf("request did not return proper status: %d", resp.StatusCode)
-		return
-	}
-	defer resp.Body.Close()
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		t.Errorf("file copy: %+v", err)
-	}
-	out.Close()
+		// Use query strings to ask for task and wait until done.
+		for {
+			query := "/?" + fmt.Sprintf("%s=%s", queryParamUUID, rtask.Key())
 
-	// Unzip the returned file and find files of the correct name.
-	_, processedPaths, errs := ziph.AsyncUnzip(outputZipFilepath, t.TempDir(), len(expectedFiles), 0755)
-	pathCount := 0
-	errCount := 0
-	for {
-		noMessage := false
-		select {
-		case pp, ok := <-processedPaths:
-			if ok {
-				if slices.Contains(expectedFiles, filepath.Base(pp)) {
-					pathCount++
-				}
-				lpf(logh.Info, "AsyncUnzip processed path: %s\n", pp)
-			} else {
-				lpf(logh.Info, "AsyncUnzip processedPaths is nil")
-				processedPaths = nil
+			stasks := []Task{}
+			if err := getAndUnmarshal(t, testServerStatus.URL+query, &stasks); err != nil {
+				t.Errorf("getAndUnmarshal error: %+v", err)
 			}
-		case err, ok := <-errs:
-			if ok {
-				errCount++
-				lpf(logh.Error, "AsyncUnzip error: %v\n", err)
-			} else {
-				lpf(logh.Info, "AsyncUnzip error channel is nil")
-				errs = nil
-			}
-		default:
-			noMessage = true
-		}
 
-		if noMessage {
-			if processedPaths == nil && errs == nil {
-				lpf(logh.Info, "AsyncUnzip is done.")
+			if len(stasks) != 1 {
+				t.Errorf("status returned incorrect data")
+			}
+			if stasks[0].Status != nil && *stasks[0].Status == Completed {
 				break
 			}
-			time.Sleep(time.Millisecond)
 		}
-	}
-	if pathCount != len(expectedFiles) {
-		t.Errorf("wrong number of files, got %d, expected %d", pathCount, len(expectedFiles))
+
+		// Get the zip file
+		outputZipFilepath := filepath.Join(t.TempDir(), "test.zip")
+		out, err := os.Create(outputZipFilepath)
+		if err != nil {
+			t.Errorf("file create: %+v", err)
+		}
+		defer out.Close()
+		client := &http.Client{}
+		query := fmt.Sprintf(`?uuid=%s`, rtask.UUID.String())
+		req, err := http.NewRequest(http.MethodGet, testServerTask.URL+query, nil)
+		if err != nil {
+			t.Errorf("NewRequest error: %v", err)
+			return
+		}
+		resp, err := client.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			t.Errorf("request did not return proper status: %d", resp.StatusCode)
+			return
+		}
+		defer resp.Body.Close()
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			t.Errorf("file copy: %+v", err)
+		}
+		out.Close()
+
+		// Unzip the returned file and find files of the correct name.
+		_, processedPaths, errs := ziph.AsyncUnzip(outputZipFilepath, t.TempDir(), len(expectedFiles), 0755)
+		pathCount := 0
+		errCount := 0
+		for {
+			noMessage := false
+			select {
+			case pp, ok := <-processedPaths:
+				if ok {
+					if slices.Contains(expectedFiles, filepath.Base(pp)) {
+						pathCount++
+					}
+					lpf(logh.Info, "AsyncUnzip processed path: %s\n", pp)
+				} else {
+					lpf(logh.Info, "AsyncUnzip processedPaths is nil")
+					processedPaths = nil
+				}
+			case err, ok := <-errs:
+				if ok {
+					errCount++
+					lpf(logh.Error, "AsyncUnzip error: %v\n", err)
+				} else {
+					lpf(logh.Info, "AsyncUnzip error channel is nil")
+					errs = nil
+				}
+			default:
+				noMessage = true
+			}
+
+			if noMessage {
+				if processedPaths == nil && errs == nil {
+					lpf(logh.Info, "AsyncUnzip is done.")
+					break
+				}
+				time.Sleep(time.Millisecond)
+			}
+		}
+		if pathCount != len(expectedFiles) {
+			t.Errorf("wrong number of files, got %d, expected %d", pathCount, len(expectedFiles))
+		}
 	}
 }
 
