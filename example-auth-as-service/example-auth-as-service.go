@@ -26,7 +26,7 @@ const (
 	relativeCertFilePath   = "/key/rest-app.crt"
 	relativeKeyFilePath    = "/key/rest-app.key"
 	relativePrivateKeyPath = "/key/jwt.rsa.private"
-	relativePublicKeyPath  = "../example-auth-as-service/key/jwt.rsa.public"
+	relativePublicKeyPath  = "/key/jwt.rsa.public"
 )
 
 var (
