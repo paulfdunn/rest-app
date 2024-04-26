@@ -60,7 +60,7 @@ type Task struct {
 	FileModifiedSeconds *int `json:",omitempty"`
 	// ProcessError, ProcessCommand, ProcessShell, ProcessZip are status information provided as the task runs.
 	ProcessCommand []string `json:",omitempty"`
-	ProcessError   []error  `json:",omitempty"`
+	ProcessError   []string `json:",omitempty"`
 	ProcessShell   []string `json:",omitempty"`
 	ProcessZip     []string `json:",omitempty"`
 	// Shell is a slice of strings of commands that are executed in a shell.
@@ -443,7 +443,7 @@ func (rt runningTask) runner() {
 		case err, ok := <-errs:
 			if ok {
 				lpf(logh.Info, "AsyncZip error: %v\n", err)
-				rt.task.ProcessError = append(rt.task.ProcessError, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, fmt.Sprintf("%+v", err))
 			} else {
 				errs = nil
 			}
@@ -514,7 +514,7 @@ func (rt runningTask) runnerExec(command bool) []string {
 			stderr, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stderrFileSuffix))
 			if err != nil {
 				lpf(logh.Error, "os.Create: %+v", err)
-				rt.task.ProcessError = append(rt.task.ProcessError, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, fmt.Sprintf("%+v", err))
 			}
 			defer func() {
 				if err := stderr.Close(); err != nil {
@@ -524,7 +524,7 @@ func (rt runningTask) runnerExec(command bool) []string {
 			stdout, err := os.Create(filepath.Join(rt.task.Dir(), cmdToFileName+stdoutFileSuffix))
 			if err != nil {
 				lpf(logh.Error, "os.Create: %+v", err)
-				rt.task.ProcessError = append(rt.task.ProcessError, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, fmt.Sprintf("%+v", err))
 			}
 			defer func() {
 				if err := stdout.Close(); err != nil {
@@ -546,7 +546,7 @@ func (rt runningTask) runnerExec(command bool) []string {
 				lpf(logh.Error, "non-zero return code %d for command: %t, cmdAndArgs: %s", rc, command, cmdAndArgs)
 			}
 			if err != nil {
-				rt.task.ProcessError = append(rt.task.ProcessError, err)
+				rt.task.ProcessError = append(rt.task.ProcessError, fmt.Sprintf("%+v", err))
 			}
 
 			// Save status information.

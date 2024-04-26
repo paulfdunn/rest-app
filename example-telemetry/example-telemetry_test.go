@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -213,8 +212,7 @@ func TestExpectedResponse(t *testing.T) {
 	task5 := Task{UUID: &validUUID}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPost, http.StatusBadRequest, nil, "", &task5})
 	task6 := Task{}
-	// TODO: taskKeyProcessError should be in this list but won't unmarshal
-	ik := []string{taskKeyCancel, taskKeyProcessCommand,
+	ik := []string{taskKeyCancel, taskKeyProcessCommand, taskKeyProcessError,
 		taskKeyProcessShell, taskKeyProcessZip, taskKeyStatus}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPost, http.StatusBadRequest, ik, "", &task6})
 
@@ -226,8 +224,7 @@ func TestExpectedResponse(t *testing.T) {
 	task8 := Task{UUID: &validUUID, Cancel: &tr}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPut, http.StatusAccepted, nil, "", &task8})
 	task9 := Task{UUID: &validUUID}
-	// TODO: taskKeyProcessError should be in this list but won't unmarshal
-	ik = []string{taskKeyCommand, taskKeyFile, taskKeyExpiration, taskKeyProcessCommand,
+	ik = []string{taskKeyCommand, taskKeyFile, taskKeyExpiration, taskKeyProcessCommand, taskKeyProcessError,
 		taskKeyProcessShell, taskKeyProcessZip, taskKeyShell, taskKeyStatus}
 	expectedResponses = append(expectedResponses, expectedResponse{handlerTask, http.MethodPut, http.StatusBadRequest, ik, "", &task9})
 
@@ -593,7 +590,7 @@ func (tsk *Task) setKey(key string, set bool) {
 		case taskKeyFile:
 			tsk.File = []string{"nothing"}
 		case taskKeyProcessError:
-			tsk.ProcessError = []error{errors.New("nothing")}
+			tsk.ProcessError = []string{"some error message"}
 		case taskKeyExpiration:
 			exp := time.Now().Add(time.Minute).Format(dateFormat)
 			tsk.Expiration = &exp
