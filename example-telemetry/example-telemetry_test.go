@@ -590,7 +590,7 @@ func (tsk *Task) setKey(key string, set bool) {
 		case taskKeyFile:
 			tsk.File = []string{"nothing"}
 		case taskKeyProcessError:
-			tsk.ProcessError = []string{"some error message"}
+			tsk.ProcessError = []string{"nothing"}
 		case taskKeyExpiration:
 			exp := time.Now().Add(time.Minute).Format(dateFormat)
 			tsk.Expiration = &exp
