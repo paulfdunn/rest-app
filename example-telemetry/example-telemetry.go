@@ -440,8 +440,18 @@ func (rt runningTask) runner() {
 		}
 
 		for _, mf := range matches {
-			if filepath.Dir(appPath) != mf {
-				filteredZipFiles = append(filteredZipFiles, zf)
+			// Protect against match paths with relative directories.
+			absApp, err := filepath.Abs(filepath.Dir(appPath))
+			if err != nil {
+				lpf(logh.Error, "Abs error on appPath:%+v", appPath, err)
+			}
+			absMf, err := filepath.Abs(mf)
+			if err != nil {
+				lpf(logh.Error, "Abs error on match path:%+v", mf, err)
+				continue
+			}
+			if absApp != absMf {
+				filteredZipFiles = append(filteredZipFiles, mf)
 			}
 		}
 	}
