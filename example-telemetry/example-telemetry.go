@@ -154,6 +154,8 @@ var (
 
 var (
 	appName = "example-telemetry"
+	// Path to this executable
+	appPath string
 
 	// API timeouts
 	apiReadTimeout  = 10 * time.Second
@@ -194,7 +196,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("fatal: %s fatal: Could not find executable path.", runtimeh.SourceInfo())
 	}
-	appPath := filepath.Dir(exe)
+	appPath = filepath.Dir(exe)
 
 	// Create the default config, then read overwrite any config that might have been saved at
 	// runtime (from a previous run, using config.Set()) with a call to config.Get()
@@ -425,6 +427,25 @@ func (rt runningTask) runner() {
 	} else {
 		zipFiles = append(zipFiles, rt.task.File...)
 	}
+
+	// Expand any filepaths that include *.
+	// Remove this path, if found. Otherwise it is essentially a recursive call to included
+	// this applications data.
+	filteredZipFiles := make([]string, 0, len(zipFiles))
+	for _, zf := range zipFiles {
+		matches, err := filepath.Glob(zf)
+		if err != nil {
+			lpf(logh.Error, "skipping filepath %s, filepath.Glob error:%+v", zf, err)
+			continue
+		}
+
+		for _, mf := range matches {
+			if filepath.Dir(appPath) != mf {
+				filteredZipFiles = append(filteredZipFiles, zf)
+			}
+		}
+	}
+
 	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), zipFiles, []string{trim})
 	for {
 		// Task might have been canceled.
