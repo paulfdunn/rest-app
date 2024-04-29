@@ -225,13 +225,6 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = telemetryKVS.Serialize(task.Key(), task)
-	if err != nil {
-		lpf(logh.Error, "%v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	// Return the task UUID
 	if aw, ok := w.(*authjwt.AuditWriter); ok {
 		aw.Message = fmt.Sprintf("task create with UUID: %s", *task.UUID)
@@ -241,10 +234,15 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(rtask)
 	if err != nil {
 		lpf(logh.Error, "json.Marshal error:%v", err)
-		// Attempt to delete the task, since the client gets an error.
-		if _, err := telemetryKVS.Delete(task.Key()); err != nil {
-			lpf(logh.Error, "telemetryKVS.Delete error:%v", err)
-		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Serialize prior to putting in the taskRun channel so there is no race condition.
+	// But this means the task needs deleted on error.
+	err = telemetryKVS.Serialize(task.Key(), task)
+	if err != nil {
+		lpf(logh.Error, "%v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -253,6 +251,10 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 	select {
 	case taskRun <- task.Key():
 	case <-time.After(postScheduleLimit):
+		// Delete the task, since the client gets an error.
+		if _, err := telemetryKVS.Delete(task.Key()); err != nil {
+			lpf(logh.Error, "telemetryKVS.Delete error:%v", err)
+		}
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}

@@ -602,7 +602,7 @@ func (rtm runningTaskMap) scheduleTasks() {
 				return
 			}
 			if dtask.UUID == nil || dtask.Status == nil {
-				lpf(logh.Error, "Deserialize task has nil UUID: %s", key)
+				lpf(logh.Error, "Deserialize task has nil UUID or Status: %s", key)
 				return
 			}
 			lpf(logh.Info, "ScheduleTasks accepting task %s", key)
