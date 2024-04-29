@@ -429,34 +429,17 @@ func (rt runningTask) runner() {
 	}
 
 	// Expand any filepaths that include *.
-	// Remove this path, if found. Otherwise it is essentially a recursive call to included
-	// this applications data.
-	filteredZipFiles := make([]string, 0, len(zipFiles))
+	expandedZipFiles := make([]string, 0, len(zipFiles))
 	for _, zf := range zipFiles {
 		matches, err := filepath.Glob(zf)
 		if err != nil {
 			lpf(logh.Error, "skipping filepath %s, filepath.Glob error:%+v", zf, err)
 			continue
 		}
-
-		for _, mf := range matches {
-			// Protect against match paths with relative directories.
-			absApp, err := filepath.Abs(filepath.Dir(appPath))
-			if err != nil {
-				lpf(logh.Error, "Abs error on appPath:%+v", appPath, err)
-			}
-			absMf, err := filepath.Abs(mf)
-			if err != nil {
-				lpf(logh.Error, "Abs error on match path:%+v", mf, err)
-				continue
-			}
-			if absApp != absMf {
-				filteredZipFiles = append(filteredZipFiles, mf)
-			}
-		}
+		expandedZipFiles = append(expandedZipFiles, matches...)
 	}
 
-	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), zipFiles, []string{trim})
+	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), expandedZipFiles, []string{trim})
 	for {
 		// Task might have been canceled.
 		if *rt.task.Status != Running {

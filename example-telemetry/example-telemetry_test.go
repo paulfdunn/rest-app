@@ -449,6 +449,8 @@ func TestRoundTrip(t *testing.T) {
 	fileModifiedSeconds := []*int{nil, &fms}
 	for i := 0; i <= 1; i++ {
 		cmd := "ls -alt"
+		// fileTestWildcard needs to match exactly ONE file
+		fileTestWildcard := "./example-telemetry.g*"
 		fileTest := "./example-telemetry.go"
 		var expectedFiles []string
 		switch i {
@@ -459,7 +461,7 @@ func TestRoundTrip(t *testing.T) {
 			expectedFiles = []string{filenameFromCommand(cmd) + stderrFileSuffix,
 				filenameFromCommand(cmd) + stdoutFileSuffix}
 		}
-		task := Task{File: []string{fileTest}, Shell: []string{cmd}, FileModifiedSeconds: fileModifiedSeconds[i]}
+		task := Task{File: []string{fileTestWildcard}, Shell: []string{cmd}, FileModifiedSeconds: fileModifiedSeconds[i]}
 		rtask, err := testTaskPost(t, task)
 		if err != nil {
 			t.Errorf("could not POST task: %+v", err)
