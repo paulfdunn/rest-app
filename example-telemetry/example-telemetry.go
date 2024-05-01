@@ -52,8 +52,9 @@ type Task struct {
 	// defaultExpirationDuration from POST. Upon Expiration a task is Canceled if still running,
 	// and all files are deleted.
 	Expiration *string `json:",omitempty"`
-	// File is a list of files and directories to be collected in returned ZIP file. Globs and wildcards
-	// are not supported.
+	// File is a list of files and directories to be collected in returned ZIP file.
+	// Command and Shell commands are executed prior to file collection, so any files
+	// created by running those commands are avaible to collect using File.
 	File []string `json:",omitempty"`
 	// The File slice is filtered to only included files with a modified time within the last
 	// FileModifiedSeconds. Default is no filtering based on file modified time.
