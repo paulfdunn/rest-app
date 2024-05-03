@@ -151,6 +151,11 @@ var (
 	taskCancel    chan string
 	taskCompleted chan string
 	taskRun       chan string
+
+	// If taskDirIncludeMarker is in a task.Command or task.Shell, it is replaced with:
+	// filepath.Join(task.Dir(),taskDirInclude)
+	taskDirIncludeMarker = "{TASK_DIR_INCLUDE}"
+	taskDirInclude       = "include/"
 )
 
 var (
@@ -322,6 +327,11 @@ func (tsk *Task) Dir() string {
 	return filepath.Join(*runtimeConfig.PersistentDirectory, taskDataDirectory, tsk.Key())
 }
 
+// DirInclude returns the filepath to include directory for the task.
+func (tsk *Task) DirInclude() string {
+	return filepath.Join(tsk.Dir(), taskDirInclude)
+}
+
 // Key returns the key used for storing/retrieving a task from telemetryKVS. Having this in a
 // function will make changing the key to something else easier. I.E. maybe add the JWT Email so
 // to the key so only the owner can operator on the task.
@@ -332,6 +342,21 @@ func (tsk *Task) Key() string {
 // ZipFilePath creates the path to the created zip file.
 func (tsk Task) ZipFilePath() string {
 	return filepath.Join(tsk.Dir(), tsk.UUID.String()+zipFileSuffix)
+}
+
+// addTaskDirInclude replaces all occurrences of taskDirIncludeMarker in Command and Shell with taskDirInclude.
+func (tsk Task) addTaskDirInclude() {
+	if tsk.Command != nil {
+		for i, cmd := range tsk.Command {
+			tsk.Command[i] = strings.ReplaceAll(cmd, taskDirIncludeMarker, tsk.DirInclude())
+		}
+	}
+
+	if tsk.Shell != nil {
+		for i, shl := range tsk.Shell {
+			tsk.Shell[i] = strings.ReplaceAll(shl, taskDirIncludeMarker, tsk.DirInclude())
+		}
+	}
 }
 
 // SliceLength is used to get the length of one of the slice fields. This main utility of this function
@@ -419,6 +444,7 @@ func (rt runningTask) runner() {
 	zipFiles := make([]string, 0, len(filepathsCmd)+len(filepathsShell)+len(rt.task.File))
 	zipFiles = append(zipFiles, filepathsCmd...)
 	zipFiles = append(zipFiles, filepathsShell...)
+	zipFiles = append(zipFiles, filepath.Join(rt.task.Dir(), taskDirInclude))
 	if rt.task.FileModifiedSeconds != nil {
 		filteredFiles, err := osh.FileModifiedAfterFilter(rt.task.File, *rt.task.FileModifiedSeconds)
 		if err != nil {
@@ -440,7 +466,11 @@ func (rt runningTask) runner() {
 		expandedZipFiles = append(expandedZipFiles, matches...)
 	}
 
-	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), expandedZipFiles, []string{trim})
+	trimInclude := filepath.Join(trim, taskDirInclude) + string(filepath.Separator)
+	// Order of trim strings is important. Each is applied in order, so longer strings need to
+	// come prior to shorter strings. I.E. children before parent paths.
+	_, processedPaths, errs := ziph.AsyncZip(rt.task.ZipFilePath(), expandedZipFiles,
+		[]string{trimInclude, trim})
 	for {
 		// Task might have been canceled.
 		if *rt.task.Status != Running {
@@ -503,6 +533,9 @@ func (rt runningTask) runnerExec(command bool) []string {
 	} else {
 		execList = rt.task.Shell
 	}
+
+	rt.task.addTaskDirInclude()
+
 	// Each command generates 2 files; stdout and stderr
 	filepaths := make([]string, 0, len(execList)*2)
 	if len(execList) > 0 {

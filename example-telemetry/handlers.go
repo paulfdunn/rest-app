@@ -215,7 +215,7 @@ func taskPost(w http.ResponseWriter, r *http.Request) {
 	task.Status = &acpt
 
 	// Create the directory used to hold output data for the task
-	if _, err := os.Stat(task.Dir()); os.IsNotExist(err) {
+	if _, err := os.Stat(task.DirInclude()); os.IsNotExist(err) {
 		if err := os.MkdirAll(task.Dir(), 0755); err != nil {
 			lpf(logh.Error, "could not create directory: %s, error: %+v", task.Dir(), err)
 		}

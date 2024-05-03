@@ -35,6 +35,29 @@ func init() {
 	testSetup(&t)
 }
 
+func Example_addTaskDirInclude() {
+	// Use a fixed uuid so the test output is determinate.
+	var uuid uuid.UUID
+	uuid = [16]byte{0x00000000}
+	// And use a fixed PersistentDirectory so the test output is determinate.
+	fd := "fixed_dir"
+	runtimeConfig.PersistentDirectory = &fd
+
+	// Use {TASK_DIR_INCLUDE} with Command
+	taskC := Task{Command: []string{"example.sh --task_dir={TASK_DIR_INCLUDE}"}, UUID: &uuid}
+	taskC.addTaskDirInclude()
+	fmt.Printf("%+v\n", taskC.Command)
+
+	// Use {TASK_DIR_INCLUDE} with Shell
+	taskS := Task{Shell: []string{"example.sh --task_dir={TASK_DIR_INCLUDE}"}, UUID: &uuid}
+	taskS.addTaskDirInclude()
+	fmt.Printf("%+v\n", taskS.Shell)
+
+	// Output:
+	// [example.sh --task_dir=fixed_dir/taskdata/00000000-0000-0000-0000-000000000000/include]
+	// [example.sh --task_dir=fixed_dir/taskdata/00000000-0000-0000-0000-000000000000/include]
+}
+
 func ExampleTaskStatus() {
 	var ts TaskStatus
 	ts = 0
@@ -449,28 +472,41 @@ func TestRoundTrip(t *testing.T) {
 	fileModifiedSeconds := []*int{nil, &fms}
 	for i := 0; i <= 1; i++ {
 		cmd := "ls -alt"
-		// fileTestWildcard needs to match exactly ONE file
+		cmdInclude := "echo 'hello world' > {TASK_DIR_INCLUDE}/helloworld.txt"
+		// fileTestWildcard needs to match exactly ONE file and that needs to be fileTest
 		fileTestWildcard := "./example-telemetry.g*"
 		fileTest := "./example-telemetry.go"
-		var expectedFiles []string
-		switch i {
-		case 0:
-			expectedFiles = []string{filenameFromCommand(cmd) + stderrFileSuffix,
-				filenameFromCommand(cmd) + stdoutFileSuffix, filepath.Base(fileTest)}
-		case 1:
-			expectedFiles = []string{filenameFromCommand(cmd) + stderrFileSuffix,
-				filenameFromCommand(cmd) + stdoutFileSuffix}
-		}
-		task := Task{File: []string{fileTestWildcard}, Shell: []string{cmd}, FileModifiedSeconds: fileModifiedSeconds[i]}
+		task := Task{File: []string{fileTestWildcard}, Shell: []string{cmd,
+			cmdInclude}, FileModifiedSeconds: fileModifiedSeconds[i]}
 		rtask, err := testTaskPost(t, task)
 		if err != nil {
 			t.Errorf("could not POST task: %+v", err)
 			return
 		}
+
+		var expectedFiles []string
+		cmdInclude = strings.ReplaceAll(cmdInclude, taskDirIncludeMarker, rtask.DirInclude())
+		switch i {
+		case 0:
+			expectedFiles = []string{
+				filenameFromCommand(cmd) + stderrFileSuffix,
+				filenameFromCommand(cmd) + stdoutFileSuffix,
+				filepath.Base(fileTest),
+				filenameFromCommand(cmdInclude) + stderrFileSuffix,
+				filenameFromCommand(cmdInclude) + stdoutFileSuffix,
+			}
+		case 1:
+			expectedFiles = []string{filenameFromCommand(cmd) + stderrFileSuffix,
+				filenameFromCommand(cmd) + stdoutFileSuffix}
+		}
+
 		testServerStatus := httptest.NewServer(http.HandlerFunc(handlerStatus))
 		defer testServerStatus.Close()
 		testServerTask := httptest.NewServer(http.HandlerFunc(handlerTask))
 		defer testServerTask.Close()
+
+		// Sleep long enough for files to age out when testing FileModifiedSeconds
+		time.Sleep(time.Duration(fms) * time.Second)
 
 		// Use query strings to ask for task and wait until done.
 		for {
