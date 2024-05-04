@@ -150,6 +150,9 @@ func taskDelete(w http.ResponseWriter, r *http.Request) {
 		lpf(logh.Error, "delete data directory %s error:%v", dtask.Dir(), err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+	if _, err := telemetryKVS.Delete(dtask.Key()); err != nil {
+		lpf(logh.Error, "telemetryKVS.Delete error:%v", err)
+	}
 
 	if aw, ok := w.(*authjwt.AuditWriter); ok {
 		aw.Message = fmt.Sprintf("delete issued for task with UUID: %s", *dtask.UUID)
