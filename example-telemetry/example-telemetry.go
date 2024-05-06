@@ -557,6 +557,7 @@ func (rt runningTask) runnerExec(command bool) []string {
 				lp(logh.Debug, "Skipping empty command.")
 				continue
 			}
+			lpf(logh.Debug, "Processing command: %+v", cmdSplit)
 			var args []string
 			if len(cmdSplit) > 1 {
 				args = cmdSplit[1:]
