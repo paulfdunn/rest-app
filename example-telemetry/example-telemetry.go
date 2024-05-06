@@ -553,6 +553,10 @@ func (rt runningTask) runnerExec(command bool) []string {
 			}
 
 			cmdSplit := strings.Fields(cmdAndArgs)
+			if len(cmdSplit) == 0 {
+				lp(logh.Debug, "Skipping empty command.")
+				continue
+			}
 			var args []string
 			if len(cmdSplit) > 1 {
 				args = cmdSplit[1:]
