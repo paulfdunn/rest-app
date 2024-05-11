@@ -89,7 +89,6 @@ func handlerStatus(w http.ResponseWriter, r *http.Request) {
 // handlerTask
 // http.MethodDelete - deletes files for Task.UUID; TaskStatus MUST be Canceled, Completed, or Expired.
 // Use queryParamUUID with a single UUID; more than one UUID is invalid.
-// Deleting a task is accomplished with a http.MethodPut with an Expiration date in the past.
 // http.MethodGet - fetch files for a task for Task.UUID; TaskStatus MUST be Canceled, Completed, or Expired.
 // Use queryParamUUID with a single UUID; more than one UUID is invalid.
 // http.MethodPost - create a new task. It is invalid to any keys other than: Command, Expiration, or Shell.
