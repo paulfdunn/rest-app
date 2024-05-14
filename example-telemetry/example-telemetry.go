@@ -690,6 +690,7 @@ func deleteExpiredTasks() {
 	}
 }
 
+// filenameFromCommand turns a command into a filename.
 func filenameFromCommand(cmd string) string {
 	// Replace characters in the command that are not valid for a file name.
 	re := regexp.MustCompile(`[` + "`" + ` ~!@#$%^&*()+=\{\[\}\]\|\?\\/><,\.';:"]+`)
