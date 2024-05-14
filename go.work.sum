@@ -1,5 +1,3 @@
-github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
-github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/paulfdunn/go-helper/archiveh v1.8.3 h1:JB9+eLDNLr2NG8bdL2zEZ0iOrlMphn6ZTbX4O92sg3Q=
 github.com/paulfdunn/go-helper/archiveh v1.8.3/go.mod h1:nm6471fcRB4cHu7wkzdBMo7pHxukq7o4suYrydfd6QE=
 github.com/paulfdunn/go-helper/archiveh v1.9.0 h1:qVxmas0vV7vCHyiOh9K3GoscrF9DZ2yUxfQ0OdqZ1gQ=
@@ -19,6 +17,9 @@ github.com/paulfdunn/go-helper/neth v1.9.0/go.mod h1:AfBGwDH4fdKel1bGZOcBYTsHkmS
 github.com/paulfdunn/go-helper/osh v1.3.7/go.mod h1:vw9S4fgUY7NDcwyxy9O9xHdCVhk+VqgHQFiICEMsoxQ=
 github.com/paulfdunn/go-helper/osh v1.9.0 h1:QbeU215F9KwPFbLwUlzaaux12sqdpwkHoqH5NjznbQY=
 github.com/paulfdunn/go-helper/osh v1.9.0/go.mod h1:vw9S4fgUY7NDcwyxy9O9xHdCVhk+VqgHQFiICEMsoxQ=
+github.com/paulfdunn/go-helper/osh v1.9.5 h1:c9Bd59te3zz2/z1L8+VLSdaglu77TIYIEhhnlILQ8X8=
+github.com/paulfdunn/go-helper/osh v1.9.5/go.mod h1:vw9S4fgUY7NDcwyxy9O9xHdCVhk+VqgHQFiICEMsoxQ=
+github.com/paulfdunn/go-helper/osh v1.10.0/go.mod h1:vw9S4fgUY7NDcwyxy9O9xHdCVhk+VqgHQFiICEMsoxQ=
 github.com/paulfdunn/go-helper/testingh v1.8.3 h1:iK18EqswP8W3qfozuzC/vZkEIi9yH9sx/VUzcHfilus=
 github.com/paulfdunn/go-helper/testingh v1.8.3/go.mod h1:Z0L0k383BuNywEfKAeTbw7kmCOz5fgiQQLjhtxhFez4=
 github.com/paulfdunn/go-helper/testingh v1.9.0/go.mod h1:Z0L0k383BuNywEfKAeTbw7kmCOz5fgiQQLjhtxhFez4=
